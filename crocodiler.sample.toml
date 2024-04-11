@@ -1,0 +1,11 @@
+token = "your_telegram_bot_token"
+db = "data/db.sqlite"
+
+[[languages]]
+id   = "en"
+name = "English"
+
+#[[languages.word_packs]]
+#id   = "A1"
+#name = "A1"
+#path = "data/en/A1.txt"

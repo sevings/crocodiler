@@ -1,0 +1,35 @@
+module crocodiler
+
+go 1.22.1
+
+require (
+	github.com/erni27/imcache v1.2.0
+	github.com/glebarez/sqlite v1.11.0
+	github.com/knadh/koanf/parsers/toml v0.1.0
+	github.com/knadh/koanf/providers/file v0.1.0
+	github.com/knadh/koanf/v2 v2.1.1
+	gopkg.in/telebot.v3 v3.2.1
+	gorm.io/gorm v1.25.9
+)
+
+require (
+	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/fsnotify/fsnotify v1.7.0 // indirect
+	github.com/glebarez/go-sqlite v1.22.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.0.0-alpha.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/knadh/koanf/maps v0.1.1 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mitchellh/copystructure v1.2.0 // indirect
+	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+	github.com/ncruces/go-strftime v0.1.9 // indirect
+	github.com/pelletier/go-toml v1.9.5 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	golang.org/x/sys v0.19.0 // indirect
+	modernc.org/libc v1.49.2 // indirect
+	modernc.org/mathutil v1.6.0 // indirect
+	modernc.org/memory v1.8.0 // indirect
+	modernc.org/sqlite v1.29.5 // indirect
+)
