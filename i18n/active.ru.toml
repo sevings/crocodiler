@@ -1,0 +1,63 @@
+[btn_become_host]
+hash = "sha1-3ba695285062446e7c81e885c372488819a93e79"
+other = "Стать ведущим"
+
+[btn_see_word]
+hash = "sha1-6f2a306251d213ccab8e4b6d2956a6121ef135c1"
+other = "Посмотреть слово"
+
+[btn_skip_word]
+hash = "sha1-54dfa3e0475314d0627f3801b2c88fbd681c552d"
+other = "Пропустить слово"
+
+[msg_add_to_group]
+hash = "sha1-16348f9eed5a413ae0ff5f64ba8e5635fbc2b7b5"
+other = "Добавьте меня в группу, чтобы играть с друзьями."
+
+[msg_curr_lang]
+hash = "sha1-caddcd67e6c10ca3d14f09d67cd04e55180e3e54"
+other = "Текущий язык: <b>{{.lang}}</b>."
+
+[msg_curr_pack]
+hash = "sha1-58bb0b65efacb6e3868a36fbae08dda5459105db"
+other = "Текуший язык: <b>{{.lang}}</b>.\nТекущий набор слов: <b>{{.pack}}</b>."
+
+[msg_game_active]
+hash = "sha1-1165977c9bfcd91318924af097af4674bb29e715"
+other = "Игра продолжается."
+
+[msg_game_stopped]
+hash = "sha1-7752f208e8cfc615d5c326c54325917c9791a509"
+other = "Игра остановлена."
+
+[msg_guessed_word]
+hash = "sha1-02c85c0f4a9d62c3a4656e653fee9bfb0103835b"
+other = "{{.name}} угадал(а) слово <b>{{.word}}</b>"
+
+[msg_lang_changed]
+hash = "sha1-2a8ff40134a06b2a41c91658f41b01552c61bc2d"
+other = "Язык изменен."
+
+[msg_new_host]
+hash = "sha1-e45f639615fb1c548336637997e81ecb63122552"
+other = "{{.name}} объясняет слово."
+
+[msg_new_word]
+hash = "sha1-9536c6797ef3f84585692053e61539ae1ef36368"
+other = "Ваше новое слово — \"{{.word}}\"."
+
+[msg_not_host]
+hash = "sha1-7766c9f9e3499335ed6227c397a241f3394587ce"
+other = "Вы сейчас не ведете игру."
+
+[msg_press_play]
+hash = "sha1-c60d516270b1f639633f978ce1d8e8e7db34366b"
+other = "Для старта игры отправьте /play."
+
+[msg_select_pack]
+hash = "sha1-33b6b571d1d9d01280ce8adeb0945c5814482fe9"
+other = "Выберите язык и набор слов."
+
+[msg_your_word]
+hash = "sha1-ed86dc63fbae3ef7349814c6098c50e083517b84"
+other = "Ваше слово — \"{{.word}}\"."

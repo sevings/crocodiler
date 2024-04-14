@@ -32,7 +32,7 @@ func main() {
 	}
 
 	game := NewGame(db, wdb)
-	bot, err := NewBot(cfg.TgToken, wdb, db, game)
+	bot, err := NewBot(cfg, wdb, db, game)
 	if err != nil {
 		panic(err)
 	}

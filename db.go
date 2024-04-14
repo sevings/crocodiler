@@ -14,6 +14,7 @@ type ChatConfig struct {
 	ChatID    int64 `gorm:"primarykey"`
 	LangID    string
 	PackID    string
+	Locale    string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt
@@ -50,4 +51,9 @@ func (db *DB) LoadChatConfig(chatID int64) *ChatConfig {
 func (db *DB) SetWordPack(chatID int64, langID, packID string) {
 	db.db.Model(&ChatConfig{}).Where(chatID).
 		Updates(&ChatConfig{LangID: langID, PackID: packID})
+}
+
+func (db *DB) setLocale(chatID int64, locale string) {
+	db.db.Model(&ChatConfig{}).Where(chatID).
+		Update("locale", locale)
 }

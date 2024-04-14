@@ -8,9 +8,16 @@ import (
 )
 
 type Config struct {
-	TgToken   string `koanf:"tg_token"`
-	DBPath    string `koanf:"db_path"`
-	Languages []LanguageConfig
+	TgToken      string `koanf:"tg_token"`
+	DBPath       string `koanf:"db_path"`
+	Translations []TranslationConfig
+	Languages    []LanguageConfig
+}
+
+type TranslationConfig struct {
+	Locale string
+	Name   string
+	Path   string
 }
 
 type LanguageConfig struct {
