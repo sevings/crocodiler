@@ -1,5 +1,20 @@
-token = "your_telegram_bot_token"
+#token = "your_telegram_bot_token"
 db = "data/db.sqlite"
+
+[default_cfg]
+locale  = "en"
+lang_id = "en"
+#pack_id = "A1"
+
+[[translations]]
+locale = "en"
+name   = "English"
+path   = "i18n/active.en.toml"
+
+[[translations]]
+locale = "ru"
+name   = "Русский"
+path   = "i18n/active.ru.toml"
 
 [[languages]]
 id   = "en"

@@ -162,6 +162,18 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game) (*Bot, error) {
 		chatGroup.Handle(&skipBtn, bot.skipWord)
 	}
 
+	if _, ok := bot.trs[cfg.DefaultCfg.Locale]; !ok {
+		return nil, fmt.Errorf("default locale '%s' not found", cfg.DefaultCfg.Locale)
+	}
+
+	if _, ok := bot.packMenus[cfg.DefaultCfg.LangID]; !ok {
+		return nil, fmt.Errorf("default word pack language '%s' not found", cfg.DefaultCfg.LangID)
+	}
+
+	if _, err := bot.wdb.GetWordPack(cfg.DefaultCfg.LangID, cfg.DefaultCfg.PackID); err != nil {
+		return nil, fmt.Errorf("default word pack '%s' not found", cfg.DefaultCfg.PackID)
+	}
+
 	bot.bot.Use(middleware.Recover())
 	//bot.bot.Use(middleware.Logger())
 
@@ -233,14 +245,7 @@ func (bot *Bot) changeTr(c tele.Context) error {
 		return err
 	}
 
-	var msg *i18n.Message
-	if c.Chat().Type == tele.ChatPrivate {
-		msg = msgAddToGroup
-	} else {
-		msg = msgPressPlay
-	}
-
-	return c.Edit(bot.tr(msg, locale))
+	return c.Edit(bot.tr(msgHelp, locale))
 }
 
 func (bot *Bot) showHelp(c tele.Context) error {

@@ -26,7 +26,12 @@ func main() {
 		panic("No word packs loaded")
 	}
 
-	db, err := LoadDatabase(cfg.DBPath)
+	defaultChatConfig := ChatConfig{
+		LangID: cfg.DefaultCfg.LangID,
+		PackID: cfg.DefaultCfg.PackID,
+		Locale: cfg.DefaultCfg.Locale,
+	}
+	db, err := LoadDatabase(cfg.DBPath, defaultChatConfig)
 	if err != nil {
 		panic(err)
 	}

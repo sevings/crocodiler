@@ -7,7 +7,8 @@ import (
 )
 
 type DB struct {
-	db *gorm.DB
+	db  *gorm.DB
+	cfg ChatConfig
 }
 
 type ChatConfig struct {
@@ -20,7 +21,7 @@ type ChatConfig struct {
 	DeletedAt gorm.DeletedAt
 }
 
-func LoadDatabase(path string) (*DB, error) {
+func LoadDatabase(path string, defaultCfg ChatConfig) (*DB, error) {
 	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 	if err != nil {
 		return nil, err
@@ -32,7 +33,8 @@ func LoadDatabase(path string) (*DB, error) {
 	}
 
 	return &DB{
-		db: db,
+		db:  db,
+		cfg: defaultCfg,
 	}, nil
 }
 
@@ -41,6 +43,7 @@ func (db *DB) LoadChatConfig(chatID int64) *ChatConfig {
 	db.db.Limit(1).Find(&cfg, chatID)
 
 	if cfg.ChatID != chatID {
+		cfg = db.cfg
 		cfg.ChatID = chatID
 		db.db.Create(&cfg)
 	}
