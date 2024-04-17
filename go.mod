@@ -3,11 +3,14 @@ module crocodiler
 go 1.22.1
 
 require (
+	github.com/BurntSushi/toml v1.3.2
 	github.com/erni27/imcache v1.2.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/knadh/koanf/parsers/toml v0.1.0
 	github.com/knadh/koanf/providers/file v0.1.0
 	github.com/knadh/koanf/v2 v2.1.1
+	github.com/nicksnyder/go-i18n/v2 v2.4.0
+	golang.org/x/text v0.14.0
 	gopkg.in/telebot.v3 v3.2.1
 	gorm.io/gorm v1.25.9
 )

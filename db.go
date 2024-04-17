@@ -11,7 +11,7 @@ type DB struct {
 }
 
 type ChatConfig struct {
-	ChatID    int64 `gorm:"primarykey"`
+	ChatID    int64 `gorm:"primaryKey;autoIncrement:false"`
 	LangID    string
 	PackID    string
 	Locale    string
