@@ -17,7 +17,6 @@ var (
 	btnSeeWord     = &i18n.Message{ID: "btn_see_word", Other: "See word"}
 	btnSkipWord    = &i18n.Message{ID: "btn_skip_word", Other: "Skip word"}
 	msgAddToGroup  = &i18n.Message{ID: "msg_add_to_group", Other: "Add me to a group chat to play with friends."}
-	msgPressPlay   = &i18n.Message{ID: "msg_press_play", Other: "Press /play to play a game."}
 	msgLangChanged = &i18n.Message{ID: "msg_lang_changed", Other: "Language changed."}
 	msgNewWord     = &i18n.Message{ID: "msg_new_word", Other: "Your new word is \"{{.word}}\"."}
 	msgCurrPack    = &i18n.Message{
@@ -32,6 +31,14 @@ var (
 	msgGameActive  = &i18n.Message{ID: "msg_game_active", Other: "Game is active."}
 	msgYourWord    = &i18n.Message{ID: "msg_your_word", Other: "Your word is \"{{.word}}\"."}
 	msgGuessedWord = &i18n.Message{ID: "msg_guessed_word", Other: "{{.name}} guessed the word <b>{{.word}}</b>"}
+	msgHelp        = &i18n.Message{ID: "msg_help", Other: "Hello! " +
+		"I am a bot created to play a word guessing game.\n\n" +
+		"The rules are simple. There is a game host and multiple players. " +
+		"The game host receives a random word and explains it to the other participants " +
+		"without using the same root words. " +
+		"Then, everyone tries to guess the word. " +
+		"When some player sends the correct guess, the game ends. " +
+		"Anyone can take on the role of the new game host, and we start from the beginning."}
 )
 
 type Bot struct {
@@ -161,6 +168,7 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game) (*Bot, error) {
 	bot.bot.Handle("/start", bot.showTrMenu)
 	bot.bot.Handle("/language", bot.showTrMenu)
 	bot.bot.Handle(tele.OnAddedToGroup, bot.showTrMenu)
+	bot.bot.Handle("/help", bot.showHelp)
 
 	chatGroup.Handle("/word_pack", bot.showLangMenu)
 	chatGroup.Handle("/play", bot.playNewGame)
@@ -233,6 +241,10 @@ func (bot *Bot) changeTr(c tele.Context) error {
 	}
 
 	return c.Edit(bot.tr(msg, locale))
+}
+
+func (bot *Bot) showHelp(c tele.Context) error {
+	return c.Send(bot.tr(msgHelp, bot.getLocale(c)))
 }
 
 func (bot *Bot) changeWordPack(c tele.Context) error {
