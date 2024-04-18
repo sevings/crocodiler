@@ -39,6 +39,7 @@ var (
 		"Then, everyone tries to guess the word. " +
 		"When some player sends the correct guess, the game ends. " +
 		"Anyone can take on the role of the new game host, and we start from the beginning."}
+	msgShutdown = &i18n.Message{ID: "msg_shutdown", Other: "The bot is about to update. It usually takes few minutes."}
 )
 
 type Bot struct {
@@ -199,11 +200,24 @@ func (bot *Bot) Start() {
 }
 
 func (bot *Bot) Stop() {
+	chatIDs := bot.game.GetActiveGames()
+	for _, chatID := range chatIDs {
+		msg := bot.tr(msgShutdown, bot.getLocaleByChatID(chatID))
+		_, err := bot.bot.Send(tele.ChatID(chatID), msg)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
 	bot.bot.Stop()
 }
 
 func (bot *Bot) getLocale(c tele.Context) string {
-	return bot.db.LoadChatConfig(c.Chat().ID).Locale
+	return bot.getLocaleByChatID(c.Chat().ID)
+}
+
+func (bot *Bot) getLocaleByChatID(chatID int64) string {
+	return bot.db.LoadChatConfig(chatID).Locale
 }
 
 func (bot *Bot) tr(msg *i18n.Message, locale string) string {

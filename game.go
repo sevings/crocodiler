@@ -192,3 +192,16 @@ func (g *Game) GetWord(chatID, playerID int64) (string, bool) {
 
 	return gameConf.word, true
 }
+
+func (g *Game) GetActiveGames() []int64 {
+	var chatIDs []int64
+
+	games := g.games.PeekAll()
+	for chatID, game := range games {
+		if game.isActive() {
+			chatIDs = append(chatIDs, chatID)
+		}
+	}
+
+	return chatIDs
+}
