@@ -52,11 +52,26 @@ func (db *DB) LoadChatConfig(chatID int64) *ChatConfig {
 }
 
 func (db *DB) SetWordPack(chatID int64, langID, packID string) {
-	db.db.Model(&ChatConfig{}).Where(chatID).
+	tx := db.db.Model(&ChatConfig{}).Where(chatID).
 		Updates(&ChatConfig{LangID: langID, PackID: packID})
+
+	if tx.RowsAffected < 1 {
+		cfg := db.cfg
+		cfg.ChatID = chatID
+		cfg.LangID = langID
+		cfg.PackID = packID
+		db.db.Create(&cfg)
+	}
 }
 
 func (db *DB) setLocale(chatID int64, locale string) {
-	db.db.Model(&ChatConfig{}).Where(chatID).
+	tx := db.db.Model(&ChatConfig{}).Where(chatID).
 		Update("locale", locale)
+
+	if tx.RowsAffected < 1 {
+		cfg := db.cfg
+		cfg.ChatID = chatID
+		cfg.Locale = locale
+		db.db.Create(&cfg)
+	}
 }
