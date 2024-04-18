@@ -31,7 +31,12 @@ var (
 	msgGameActive  = &i18n.Message{ID: "msg_game_active", Other: "Game is active."}
 	msgYourWord    = &i18n.Message{ID: "msg_your_word", Other: "Your word is \"{{.word}}\"."}
 	msgGuessedWord = &i18n.Message{ID: "msg_guessed_word", Other: "{{.name}} guessed the word <b>{{.word}}</b>"}
-	msgHelp        = &i18n.Message{ID: "msg_help", Other: "Hello! " +
+	msgHelp        = &i18n.Message{ID: "msg_help", Other: "" +
+		"Send /play to start a new game.\n" +
+		"Send /word_pack to select a word pack.\n" +
+		"Send /language to change interface language.\n" +
+		"Send /stop to stop the current game.\n"}
+	msgRules = &i18n.Message{ID: "msg_rules", Other: "Hello! " +
 		"I am a bot created to play a word guessing game.\n\n" +
 		"The rules are simple. There is a game host and multiple players. " +
 		"The game host receives a random word and explains it to the other participants " +
@@ -259,11 +264,31 @@ func (bot *Bot) changeTr(c tele.Context) error {
 		return err
 	}
 
-	return c.Edit(bot.tr(msgHelp, locale))
+	msg := bot.tr(msgRules, locale)
+	msg += "\n\n"
+
+	if c.Chat().Type == tele.ChatPrivate {
+		msg += bot.tr(msgAddToGroup, locale)
+	} else {
+		msg += bot.tr(msgHelp, locale)
+	}
+
+	return c.Edit(msg)
 }
 
 func (bot *Bot) showHelp(c tele.Context) error {
-	return c.Send(bot.tr(msgHelp, bot.getLocale(c)))
+	locale := bot.getLocale(c)
+
+	msg := bot.tr(msgRules, locale)
+	msg += "\n\n"
+
+	if c.Chat().Type == tele.ChatPrivate {
+		msg += bot.tr(msgAddToGroup, locale)
+	} else {
+		msg += bot.tr(msgHelp, locale)
+	}
+
+	return c.Send(msg)
 }
 
 func (bot *Bot) changeWordPack(c tele.Context) error {
