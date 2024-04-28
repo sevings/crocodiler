@@ -5,11 +5,13 @@ import (
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
+	"time"
 )
 
 type Config struct {
 	TgToken      string        `koanf:"tg_token"`
 	DBPath       string        `koanf:"db_path"`
+	GameExp      time.Duration `koanf:"game_exp"`
 	DefaultCfg   DefaultConfig `koanf:"default_cfg"`
 	Translations []TranslationConfig
 	Languages    []LanguageConfig

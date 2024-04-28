@@ -1,5 +1,6 @@
 #token = "your_telegram_bot_token"
 db = "data/db.sqlite"
+game_exp = "72h"
 
 [default_cfg]
 locale  = "en"

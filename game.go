@@ -50,12 +50,18 @@ type Game struct {
 	games imcache.Cache[int64, *gameConfig]
 	db    *DB
 	wdb   *WordDB
+	exp   imcache.Expiration
 }
 
-func NewGame(db *DB, wdb *WordDB) *Game {
+func NewGame(db *DB, wdb *WordDB, exp time.Duration) *Game {
+	if exp < time.Hour {
+		exp = time.Hour
+	}
+
 	return &Game{
 		db:  db,
 		wdb: wdb,
+		exp: imcache.WithSlidingExpiration(exp),
 	}
 }
 
@@ -77,7 +83,7 @@ func (g *Game) Play(chatID, hostID int64) (string, error) {
 
 	gameConf.setWord()
 
-	g.games.Set(chatID, &gameConf, imcache.WithSlidingExpiration(24*time.Hour))
+	g.games.Set(chatID, &gameConf, g.exp)
 
 	return gameConf.word, nil
 }
@@ -103,7 +109,7 @@ func (g *Game) SetWordPack(chatID, playerID int64, langID, packID string) (strin
 		gameConf.setWord()
 	}
 
-	g.games.Set(chatID, gameConf, imcache.WithSlidingExpiration(24*time.Hour))
+	g.games.Set(chatID, gameConf, g.exp)
 
 	return gameConf.word, nil
 }
@@ -120,7 +126,7 @@ func (g *Game) Stop(chatID, playerID int64) bool {
 
 	gameConf.setNotActive()
 
-	g.games.Set(chatID, gameConf, imcache.WithSlidingExpiration(24*time.Hour))
+	g.games.Set(chatID, gameConf, g.exp)
 
 	return true
 }

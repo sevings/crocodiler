@@ -36,7 +36,7 @@ func main() {
 		panic(err)
 	}
 
-	game := NewGame(db, wdb)
+	game := NewGame(db, wdb, cfg.GameExp)
 	bot, err := NewBot(cfg, wdb, db, game)
 	if err != nil {
 		panic(err)
