@@ -1,6 +1,7 @@
 #token = "your_telegram_bot_token"
 db = "data/db.sqlite"
 game_exp = "72h"
+dict_path = "data/dict.db"
 
 [default_cfg]
 locale  = "en"
@@ -20,10 +21,6 @@ path   = "i18n/active.ru.toml"
 [[languages]]
 id   = "en"
 name = "English"
-
-#[languages.dict]
-#path    = "data/en/dict/stardict.ifo"
-#pattern = "(?s)(?:^|\\n)%s\\.\\n(.*?)(?:\\n\\w+\\.\\n|$)"
 
 #[[languages.word_packs]]
 #id   = "A1"

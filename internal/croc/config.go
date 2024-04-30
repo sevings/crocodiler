@@ -11,6 +11,7 @@ import (
 type Config struct {
 	TgToken      string        `koanf:"tg_token"`
 	DBPath       string        `koanf:"db_path"`
+	DictPath     string        `koanf:"dict_path"`
 	GameExp      time.Duration `koanf:"game_exp"`
 	DefaultCfg   DefaultConfig `koanf:"default_cfg"`
 	Translations []TranslationConfig
@@ -32,13 +33,7 @@ type TranslationConfig struct {
 type LanguageConfig struct {
 	ID        string
 	Name      string
-	Dict      DictConfig
 	WordPacks []WordPackConfig `koanf:"word_packs"`
-}
-
-type DictConfig struct {
-	Path    string
-	Pattern string
 }
 
 type WordPackConfig struct {

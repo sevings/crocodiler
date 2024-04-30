@@ -72,7 +72,7 @@ func NewGame(db *DB, wdb *WordDB, dict *Dict, exp time.Duration) *Game {
 
 func (g *Game) setWord(gc *gameConfig) {
 	gc.word = gc.pack.GetWord()
-	def, err := g.dict.FindDefinition(gc.pack.GetLangID(), gc.word, gc.pack.GetDefRe())
+	def, err := g.dict.FindDefinition(gc.pack.GetLangID(), gc.pack.GetPart(), gc.word)
 	if err != nil {
 		log.Println(err)
 	}

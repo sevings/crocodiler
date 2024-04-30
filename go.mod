@@ -32,6 +32,7 @@ require (
 	github.com/pebbe/dictzip v1.0.1 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	go.etcd.io/bbolt v1.3.9 // indirect
 	golang.org/x/sys v0.19.0 // indirect
 	modernc.org/libc v1.49.2 // indirect
 	modernc.org/mathutil v1.6.0 // indirect

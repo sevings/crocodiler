@@ -3,16 +3,16 @@ package croc
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
-	"regexp"
 	"strings"
 )
 
 type WordPack struct {
 	langID string
 	packID string
-	defRe  *regexp.Regexp
+	part   string
 	words  []string
 }
 
@@ -29,25 +29,27 @@ func (pack *WordPack) GetPackID() string {
 	return pack.packID
 }
 
-func (pack *WordPack) GetDefRe() *regexp.Regexp {
-	return pack.defRe
+func (pack *WordPack) GetPart() string {
+	return pack.part
 }
 
-func loadWordPack(langID, packID, path, defRe string) (*WordPack, error) {
+func loadWordPack(langID, packID, path, part string) (*WordPack, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}(file)
 
 	pack := &WordPack{
 		langID: langID,
 		packID: packID,
+		part:   part,
 		words:  make([]string, 0, 200),
-	}
-
-	if defRe != "" {
-		pack.defRe = regexp.MustCompile(defRe)
 	}
 
 	scanner := bufio.NewScanner(file)
@@ -131,8 +133,8 @@ func (db *WordDB) GetWordPack(langID, packID string) (*WordPack, error) {
 	return pack, nil
 }
 
-func (db *WordDB) LoadWordPack(path, langID, packID, defRe, langName, packName string) error {
-	pack, err := loadWordPack(langID, packID, path, defRe)
+func (db *WordDB) LoadWordPack(path, langID, packID, part, langName, packName string) error {
+	pack, err := loadWordPack(langID, packID, path, part)
 	if err != nil {
 		return err
 	}
