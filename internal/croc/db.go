@@ -1,4 +1,4 @@
-package main
+package croc
 
 import (
 	"github.com/glebarez/sqlite"

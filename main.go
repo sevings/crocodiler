@@ -1,18 +1,19 @@
 package main
 
 import (
+	"crocodiler/internal/croc"
 	"fmt"
 	"os"
 	"os/signal"
 )
 
 func main() {
-	cfg, err := LoadConfig()
+	cfg, err := croc.LoadConfig()
 	if err != nil {
 		panic(err)
 	}
 
-	wdb := NewWordDB()
+	wdb := croc.NewWordDB()
 	for _, lang := range cfg.Languages {
 		for _, pack := range lang.WordPacks {
 			defRe := fmt.Sprintf(lang.Dict.Pattern, pack.Part)
@@ -27,17 +28,17 @@ func main() {
 		panic("No word packs loaded")
 	}
 
-	defaultChatConfig := ChatConfig{
+	defaultChatConfig := croc.ChatConfig{
 		LangID: cfg.DefaultCfg.LangID,
 		PackID: cfg.DefaultCfg.PackID,
 		Locale: cfg.DefaultCfg.Locale,
 	}
-	db, err := LoadDatabase(cfg.DBPath, defaultChatConfig)
+	db, err := croc.LoadDatabase(cfg.DBPath, defaultChatConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	dict := NewDict()
+	dict := croc.NewDict()
 	for _, lang := range cfg.Languages {
 		if lang.Dict.Path != "" {
 			err = dict.LoadDict(lang.ID, lang.Dict.Path)
@@ -47,8 +48,8 @@ func main() {
 		}
 	}
 
-	game := NewGame(db, wdb, dict, cfg.GameExp)
-	bot, err := NewBot(cfg, wdb, db, game)
+	game := croc.NewGame(db, wdb, dict, cfg.GameExp)
+	bot, err := croc.NewBot(cfg, wdb, db, game)
 	if err != nil {
 		panic(err)
 	}
