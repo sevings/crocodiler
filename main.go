@@ -15,7 +15,8 @@ func main() {
 	wdb := NewWordDB()
 	for _, lang := range cfg.Languages {
 		for _, pack := range lang.WordPacks {
-			err := wdb.LoadWordPack(pack.Path, lang.ID, pack.ID, lang.Name, pack.Name)
+			defRe := fmt.Sprintf(lang.Dict.Pattern, pack.Part)
+			err := wdb.LoadWordPack(pack.Path, lang.ID, pack.ID, defRe, lang.Name, pack.Name)
 			if err != nil {
 				fmt.Printf("Error loading %s/%s wordset: %s", lang.ID, pack.ID, err.Error())
 			}
@@ -36,7 +37,17 @@ func main() {
 		panic(err)
 	}
 
-	game := NewGame(db, wdb, cfg.GameExp)
+	dict := NewDict()
+	for _, lang := range cfg.Languages {
+		if lang.Dict.Path != "" {
+			err = dict.LoadDict(lang.ID, lang.Dict.Path)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	game := NewGame(db, wdb, dict, cfg.GameExp)
 	bot, err := NewBot(cfg, wdb, db, game)
 	if err != nil {
 		panic(err)

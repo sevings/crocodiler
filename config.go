@@ -32,13 +32,20 @@ type TranslationConfig struct {
 type LanguageConfig struct {
 	ID        string
 	Name      string
+	Dict      DictConfig
 	WordPacks []WordPackConfig `koanf:"word_packs"`
+}
+
+type DictConfig struct {
+	Path    string
+	Pattern string
 }
 
 type WordPackConfig struct {
 	ID   string
 	Name string
 	Path string
+	Part string
 }
 
 func LoadConfig() (Config, error) {

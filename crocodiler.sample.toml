@@ -21,7 +21,12 @@ path   = "i18n/active.ru.toml"
 id   = "en"
 name = "English"
 
+#[languages.dict]
+#path    = "data/en/dict/stardict.ifo"
+#pattern = "(?s)(?:^|\\n)%s\\.\\n(.*?)(?:\\n\\w+\\.\\n|$)"
+
 #[[languages.word_packs]]
 #id   = "A1"
 #name = "A1"
 #path = "data/en/A1.txt"
+#part = "n"

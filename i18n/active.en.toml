@@ -1,4 +1,5 @@
 btn_become_host = "Become a host"
+btn_peek_definition = "Peek definition"
 btn_see_word = "See word"
 btn_skip_word = "Skip word"
 msg_add_to_group = "Add me to a group chat to play with friends."

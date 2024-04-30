@@ -15,6 +15,7 @@ import (
 var (
 	btnBecomeHost  = &i18n.Message{ID: "btn_become_host", Other: "Become a host"}
 	btnSeeWord     = &i18n.Message{ID: "btn_see_word", Other: "See word"}
+	btnPeekDef     = &i18n.Message{ID: "btn_peek_definition", Other: "Peek definition"}
 	btnSkipWord    = &i18n.Message{ID: "btn_skip_word", Other: "Skip word"}
 	msgAddToGroup  = &i18n.Message{ID: "msg_add_to_group", Other: "Add me to a group chat to play with friends."}
 	msgLangChanged = &i18n.Message{ID: "msg_lang_changed", Other: "Language changed."}
@@ -54,11 +55,12 @@ type Bot struct {
 	game *Game
 	trs  map[string]*i18n.Localizer
 
-	packMenus map[string]*tele.ReplyMarkup
-	langMenu  *tele.ReplyMarkup
-	hostMenus map[string]*tele.ReplyMarkup
-	wordMenus map[string]*tele.ReplyMarkup
-	trMenu    *tele.ReplyMarkup
+	packMenus    map[string]*tele.ReplyMarkup
+	langMenu     *tele.ReplyMarkup
+	hostMenus    map[string]*tele.ReplyMarkup
+	wordMenus    map[string]*tele.ReplyMarkup
+	wordDefMenus map[string]*tele.ReplyMarkup
+	trMenu       *tele.ReplyMarkup
 }
 
 func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game) (*Bot, error) {
@@ -79,11 +81,12 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game) (*Bot, error) {
 		game: game,
 		trs:  make(map[string]*i18n.Localizer),
 
-		packMenus: make(map[string]*tele.ReplyMarkup),
-		langMenu:  &tele.ReplyMarkup{},
-		hostMenus: make(map[string]*tele.ReplyMarkup),
-		wordMenus: make(map[string]*tele.ReplyMarkup),
-		trMenu:    &tele.ReplyMarkup{},
+		packMenus:    make(map[string]*tele.ReplyMarkup),
+		langMenu:     &tele.ReplyMarkup{},
+		hostMenus:    make(map[string]*tele.ReplyMarkup),
+		wordMenus:    make(map[string]*tele.ReplyMarkup),
+		wordDefMenus: make(map[string]*tele.ReplyMarkup),
+		trMenu:       &tele.ReplyMarkup{},
 	}
 
 	chatGroup := bot.bot.Group()
@@ -160,11 +163,17 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game) (*Bot, error) {
 	for _, tr := range cfg.Translations {
 		wordMenu := &tele.ReplyMarkup{}
 		seeBtn := wordMenu.Data(bot.tr(btnSeeWord, tr.Locale), "see_word")
+		defBtn := wordMenu.Data(bot.tr(btnPeekDef, tr.Locale), "see_def")
 		skipBtn := wordMenu.Data(bot.tr(btnSkipWord, tr.Locale), "skip_word")
 		wordMenu.Inline(wordMenu.Row(seeBtn), wordMenu.Row(skipBtn))
 		bot.wordMenus[tr.Locale] = wordMenu
 
+		wordDefMenu := &tele.ReplyMarkup{}
+		wordDefMenu.Inline(wordDefMenu.Row(seeBtn), wordDefMenu.Row(defBtn), wordDefMenu.Row(skipBtn))
+		bot.wordDefMenus[tr.Locale] = wordDefMenu
+
 		chatGroup.Handle(&seeBtn, bot.showWord)
+		chatGroup.Handle(&defBtn, bot.showDefinition)
 		chatGroup.Handle(&skipBtn, bot.skipWord)
 	}
 
@@ -293,7 +302,7 @@ func (bot *Bot) showHelp(c tele.Context) error {
 
 func (bot *Bot) changeWordPack(c tele.Context) error {
 	langPack := strings.Split(c.Data(), "|")
-	word, err := bot.game.SetWordPack(c.Chat().ID, c.Sender().ID, langPack[0], langPack[1])
+	word, hasDef, err := bot.game.SetWordPack(c.Chat().ID, c.Sender().ID, langPack[0], langPack[1])
 	if err != nil {
 		log.Println(err)
 		return c.Respond()
@@ -328,6 +337,8 @@ func (bot *Bot) changeWordPack(c tele.Context) error {
 	}
 	if word == "" {
 		return c.Edit(bot.trCfg(lc, locale), tele.ModeHTML)
+	} else if hasDef {
+		return c.Edit(bot.trCfg(lc, locale), bot.wordDefMenus[locale], tele.ModeHTML)
 	} else {
 		return c.Edit(bot.trCfg(lc, locale), bot.wordMenus[locale], tele.ModeHTML)
 	}
@@ -369,7 +380,7 @@ func (bot *Bot) showLangMenu(c tele.Context) error {
 
 func (bot *Bot) playNewGame(c tele.Context) error {
 	locale := bot.getLocale(c)
-	_, err := bot.game.Play(c.Chat().ID, c.Sender().ID)
+	hasDef, err := bot.game.Play(c.Chat().ID, c.Sender().ID)
 	if err != nil {
 		log.Println(err)
 		msg := bot.tr(msgSelectPack, locale)
@@ -383,6 +394,9 @@ func (bot *Bot) playNewGame(c tele.Context) error {
 		},
 	}
 	msg := bot.trCfg(lc, locale)
+	if hasDef {
+		return c.Send(msg, bot.wordDefMenus[locale], tele.ModeHTML)
+	}
 	return c.Send(msg, bot.wordMenus[locale], tele.ModeHTML)
 }
 
@@ -397,7 +411,7 @@ func (bot *Bot) stopGame(c tele.Context) error {
 
 func (bot *Bot) assignGameHost(c tele.Context) error {
 	locale := bot.getLocale(c)
-	word, ok := bot.game.NextWord(c.Chat().ID, c.Sender().ID)
+	word, hasDef, ok := bot.game.NextWord(c.Chat().ID, c.Sender().ID)
 	if !ok {
 		return c.Respond(&tele.CallbackResponse{
 			Text:      bot.tr(msgGameActive, locale),
@@ -426,6 +440,9 @@ func (bot *Bot) assignGameHost(c tele.Context) error {
 		},
 	}
 	msg := bot.trCfg(lc, locale)
+	if hasDef {
+		return c.Send(msg, bot.wordDefMenus[locale], tele.ModeHTML)
+	}
 	return c.Send(msg, bot.wordMenus[locale], tele.ModeHTML)
 }
 
@@ -450,17 +467,30 @@ func (bot *Bot) showWord(c tele.Context) error {
 	})
 }
 
-func (bot *Bot) skipWord(c tele.Context) error {
-	var text string
-	word, ok := bot.game.SkipWord(c.Chat().ID, c.Sender().ID)
-	if ok {
-		lc := &i18n.LocalizeConfig{
-			DefaultMessage: msgNewWord,
-			TemplateData: map[string]string{
-				"word": word,
-			},
+func truncateDefinition(text string, maxLen int) string {
+	if len(text) <= maxLen {
+		return text
+	}
+
+	text = text[:maxLen-1]
+	lastIdx := strings.LastIndexByte(text, '\n')
+	if lastIdx < maxLen/2 {
+		lastIdx = strings.LastIndexByte(text, '.')
+		if lastIdx < maxLen/2 {
+			lastIdx = strings.LastIndexByte(text, ' ')
+			if lastIdx < 0 {
+				lastIdx = maxLen - 1
+			}
 		}
-		text = bot.trCfg(lc, bot.getLocale(c))
+	}
+
+	return text[:lastIdx] + "…"
+}
+
+func (bot *Bot) showDefinition(c tele.Context) error {
+	text, hasDef := bot.game.GetDefinition(c.Chat().ID, c.Sender().ID)
+	if hasDef {
+		text = truncateDefinition(text, 200)
 	} else {
 		text = bot.tr(msgNotHost, bot.getLocale(c))
 	}
@@ -471,10 +501,54 @@ func (bot *Bot) skipWord(c tele.Context) error {
 	})
 }
 
+func (bot *Bot) skipWord(c tele.Context) error {
+	var text string
+	locale := bot.getLocale(c)
+	word, hasDef, ok := bot.game.SkipWord(c.Chat().ID, c.Sender().ID)
+	if ok {
+		lc := &i18n.LocalizeConfig{
+			DefaultMessage: msgNewWord,
+			TemplateData: map[string]string{
+				"word": word,
+			},
+		}
+		text = bot.trCfg(lc, locale)
+	} else {
+		text = bot.tr(msgNotHost, locale)
+	}
+
+	oldHasDef := len(c.Message().ReplyMarkup.InlineKeyboard) > 2
+	if oldHasDef != hasDef {
+		var err error
+		if hasDef {
+			err = c.Edit(bot.wordDefMenus[locale], tele.ModeHTML)
+		} else {
+			err = c.Edit(bot.wordMenus[locale], tele.ModeHTML)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return c.Respond(&tele.CallbackResponse{
+		Text:      text,
+		ShowAlert: true,
+	})
+}
+
 func (bot *Bot) checkGuess(c tele.Context) error {
-	word, guessed := bot.game.CheckGuess(c.Chat().ID, c.Sender().ID, c.Text())
+	word, def, guessed := bot.game.CheckGuess(c.Chat().ID, c.Sender().ID, c.Text())
 	if !guessed {
 		return nil
+	}
+
+	if def != "" {
+		def = truncateDefinition(def, 1000)
+		def = word + "\n\n" + def
+		err := c.Send(def)
+		if err != nil {
+			return err
+		}
 	}
 
 	locale := bot.getLocale(c)

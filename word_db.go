@@ -5,30 +5,56 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"regexp"
 	"strings"
 )
 
-type WordPack []string
-
-func (pack WordPack) GetWord() string {
-	i := rand.Intn(len(pack))
-	return pack[i]
+type WordPack struct {
+	langID string
+	packID string
+	defRe  *regexp.Regexp
+	words  []string
 }
 
-func loadWordPack(path string) (WordPack, error) {
+func (pack *WordPack) GetWord() string {
+	i := rand.Intn(len(pack.words))
+	return pack.words[i]
+}
+
+func (pack *WordPack) GetLangID() string {
+	return pack.langID
+}
+
+func (pack *WordPack) GetPackID() string {
+	return pack.packID
+}
+
+func (pack *WordPack) GetDefRe() *regexp.Regexp {
+	return pack.defRe
+}
+
+func loadWordPack(langID, packID, path, defRe string) (*WordPack, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	pack := make([]string, 0, 200)
+	pack := &WordPack{
+		langID: langID,
+		packID: packID,
+		words:  make([]string, 0, 200),
+	}
+
+	if defRe != "" {
+		pack.defRe = regexp.MustCompile(defRe)
+	}
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		word := strings.TrimSpace(scanner.Text())
 		if word != "" {
-			pack = append(pack, word)
+			pack.words = append(pack.words, word)
 		}
 	}
 
@@ -36,7 +62,7 @@ func loadWordPack(path string) (WordPack, error) {
 		return nil, err
 	}
 
-	if len(pack) == 0 {
+	if len(pack.words) == 0 {
 		return nil, fmt.Errorf("word pack in %s is empty", path)
 	}
 
@@ -48,7 +74,7 @@ type WordDB struct {
 	packIDs   map[string][]string
 	langNames map[string]string
 	packNames map[string]map[string]string
-	packs     map[string]map[string]WordPack
+	packs     map[string]map[string]*WordPack
 }
 
 func NewWordDB() *WordDB {
@@ -57,7 +83,7 @@ func NewWordDB() *WordDB {
 		packIDs:   make(map[string][]string),
 		langNames: make(map[string]string),
 		packNames: make(map[string]map[string]string),
-		packs:     make(map[string]map[string]WordPack),
+		packs:     make(map[string]map[string]*WordPack),
 	}
 }
 
@@ -96,7 +122,7 @@ func (db *WordDB) GetWordPackName(langID, packID string) (string, error) {
 	return name, nil
 }
 
-func (db *WordDB) GetWordPack(langID, packID string) (WordPack, error) {
+func (db *WordDB) GetWordPack(langID, packID string) (*WordPack, error) {
 	pack, ok := db.packs[langID][packID]
 	if !ok {
 		return nil, fmt.Errorf("word pack %s/%s does not exist", langID, packID)
@@ -105,8 +131,8 @@ func (db *WordDB) GetWordPack(langID, packID string) (WordPack, error) {
 	return pack, nil
 }
 
-func (db *WordDB) LoadWordPack(path, langID, packID, langName, packName string) error {
-	pack, err := loadWordPack(path)
+func (db *WordDB) LoadWordPack(path, langID, packID, defRe, langName, packName string) error {
+	pack, err := loadWordPack(langID, packID, path, defRe)
 	if err != nil {
 		return err
 	}
@@ -116,7 +142,7 @@ func (db *WordDB) LoadWordPack(path, langID, packID, langName, packName string) 
 		db.packIDs[langID] = make([]string, 0)
 		db.langNames[langID] = langName
 		db.packNames[langID] = make(map[string]string)
-		db.packs[langID] = make(map[string]WordPack)
+		db.packs[langID] = make(map[string]*WordPack)
 	}
 
 	db.packs[langID][packID] = pack

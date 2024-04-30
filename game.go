@@ -3,13 +3,15 @@ package main
 import (
 	"errors"
 	"github.com/erni27/imcache"
+	"log"
 	"strings"
 	"time"
 )
 
 type gameConfig struct {
-	pack   WordPack
+	pack   *WordPack
 	word   string
+	def    string
 	hostID int64
 }
 
@@ -19,10 +21,11 @@ func (gc *gameConfig) isActive() bool {
 
 func (gc *gameConfig) setNotActive() {
 	gc.word = ""
+	gc.def = ""
 }
 
-func (gc *gameConfig) setWord() {
-	gc.word = gc.pack.GetWord()
+func (gc *gameConfig) hasDefinition() bool {
+	return gc.def != ""
 }
 
 func (gc *gameConfig) checkGuess(playerID int64, guess string) bool {
@@ -50,68 +53,79 @@ type Game struct {
 	games imcache.Cache[int64, *gameConfig]
 	db    *DB
 	wdb   *WordDB
+	dict  *Dict
 	exp   imcache.Expiration
 }
 
-func NewGame(db *DB, wdb *WordDB, exp time.Duration) *Game {
+func NewGame(db *DB, wdb *WordDB, dict *Dict, exp time.Duration) *Game {
 	if exp < time.Hour {
 		exp = time.Hour
 	}
 
 	return &Game{
-		db:  db,
-		wdb: wdb,
-		exp: imcache.WithSlidingExpiration(exp),
+		db:   db,
+		wdb:  wdb,
+		dict: dict,
+		exp:  imcache.WithSlidingExpiration(exp),
 	}
 }
 
-func (g *Game) Play(chatID, hostID int64) (string, error) {
+func (g *Game) setWord(gc *gameConfig) {
+	gc.word = gc.pack.GetWord()
+	def, err := g.dict.FindDefinition(gc.pack.GetLangID(), gc.word, gc.pack.GetDefRe())
+	if err != nil {
+		log.Println(err)
+	}
+	gc.def = def
+}
+
+func (g *Game) Play(chatID, hostID int64) (bool, error) {
 	chatConf := g.db.LoadChatConfig(chatID)
 	if chatConf.PackID == "" {
-		return "", errors.New("word pack is not chosen")
+		return false, errors.New("word pack is not chosen")
 	}
 
 	pack, err := g.wdb.GetWordPack(chatConf.LangID, chatConf.PackID)
 	if err != nil {
-		return "", err
+		return false, err
 	}
 
-	gameConf := gameConfig{
+	gameConf := &gameConfig{
 		pack:   pack,
 		hostID: hostID,
 	}
 
-	gameConf.setWord()
+	g.setWord(gameConf)
 
-	g.games.Set(chatID, &gameConf, g.exp)
+	g.games.Set(chatID, gameConf, g.exp)
 
-	return gameConf.word, nil
+	return gameConf.hasDefinition(), nil
 }
 
-func (g *Game) SetWordPack(chatID, playerID int64, langID, packID string) (string, error) {
+func (g *Game) SetWordPack(chatID, playerID int64, langID, packID string) (string, bool, error) {
 	gameConf, ok := g.games.Get(chatID)
 	if !ok {
-		return "", nil
+		return "", false, nil
 	}
 
 	if gameConf.isActive() && gameConf.hostID != playerID {
-		return "", errors.New("the player is not a host of this game")
+		return "", false, errors.New("the player is not a host of this game")
 	}
 
 	pack, err := g.wdb.GetWordPack(langID, packID)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	gameConf.pack = pack
 
 	if gameConf.isActive() {
-		gameConf.setWord()
+		g.setWord(gameConf)
 	}
 
 	g.games.Set(chatID, gameConf, g.exp)
 
-	return gameConf.word, nil
+	return gameConf.word, gameConf.hasDefinition(), nil
 }
 
 func (g *Game) Stop(chatID, playerID int64) bool {
@@ -131,55 +145,56 @@ func (g *Game) Stop(chatID, playerID int64) bool {
 	return true
 }
 
-func (g *Game) CheckGuess(chatID, playerID int64, guess string) (string, bool) {
+func (g *Game) CheckGuess(chatID, playerID int64, guess string) (string, string, bool) {
 	gameConf, ok := g.games.Get(chatID)
 	if !ok {
-		return "", false
+		return "", "", false
 	}
 
 	if !gameConf.checkGuess(playerID, guess) {
-		return "", false
+		return "", "", false
 	}
 
 	word := gameConf.word
+	def := gameConf.def
 	gameConf.setNotActive()
 
-	return word, true
+	return word, def, true
 }
 
-func (g *Game) NextWord(chatID, hostID int64) (string, bool) {
+func (g *Game) NextWord(chatID, hostID int64) (string, bool, bool) {
 	gameConf, ok := g.games.Get(chatID)
 	if !ok {
-		return "", false
+		return "", false, false
 	}
 
 	if gameConf.isActive() {
-		return "", false
+		return "", false, false
 	}
 
 	gameConf.hostID = hostID
-	gameConf.setWord()
+	g.setWord(gameConf)
 
-	return gameConf.word, true
+	return gameConf.word, gameConf.hasDefinition(), true
 }
 
-func (g *Game) SkipWord(chatID, playerID int64) (string, bool) {
+func (g *Game) SkipWord(chatID, playerID int64) (string, bool, bool) {
 	gameConf, ok := g.games.Get(chatID)
 	if !ok {
-		return "", false
+		return "", false, false
 	}
 
 	if !gameConf.isActive() {
-		return "", false
+		return "", false, false
 	}
 
 	if gameConf.hostID != playerID {
-		return "", false
+		return "", false, false
 	}
 
-	gameConf.setWord()
+	g.setWord(gameConf)
 
-	return gameConf.word, true
+	return gameConf.word, gameConf.hasDefinition(), true
 }
 
 func (g *Game) GetWord(chatID, playerID int64) (string, bool) {
@@ -197,6 +212,27 @@ func (g *Game) GetWord(chatID, playerID int64) (string, bool) {
 	}
 
 	return gameConf.word, true
+}
+
+func (g *Game) GetDefinition(chatID, playerID int64) (string, bool) {
+	gameConf, ok := g.games.Get(chatID)
+	if !ok {
+		return "", false
+	}
+
+	if !gameConf.isActive() {
+		return "", false
+	}
+
+	if gameConf.hostID != playerID {
+		return "", false
+	}
+
+	if !gameConf.hasDefinition() {
+		return "", false
+	}
+
+	return gameConf.def, true
 }
 
 func (g *Game) GetActiveGames() []int64 {

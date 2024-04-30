@@ -2,6 +2,10 @@
 hash = "sha1-3ba695285062446e7c81e885c372488819a93e79"
 other = "Стать ведущим"
 
+[btn_peek_definition]
+hash = "sha1-9c6967433d7b97956a25b995737a9e5e0934e8ca"
+other = "Посмотреть определение"
+
 [btn_see_word]
 hash = "sha1-6f2a306251d213ccab8e4b6d2956a6121ef135c1"
 other = "Посмотреть слово"
