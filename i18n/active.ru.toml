@@ -14,6 +14,10 @@ other = "Посмотреть слово"
 hash = "sha1-54dfa3e0475314d0627f3801b2c88fbd681c552d"
 other = "Пропустить слово"
 
+[btn_whats_that]
+hash = "sha1-d8baec73fa9eedff47765cc75f74654a5830aeb7"
+other = "Что это такое?"
+
 [msg_add_to_group]
 hash = "sha1-16348f9eed5a413ae0ff5f64ba8e5635fbc2b7b5"
 other = "Добавьте меня в группу, чтобы играть с друзьями."

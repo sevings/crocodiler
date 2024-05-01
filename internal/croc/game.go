@@ -145,21 +145,21 @@ func (g *Game) Stop(chatID, playerID int64) bool {
 	return true
 }
 
-func (g *Game) CheckGuess(chatID, playerID int64, guess string) (string, string, bool) {
+func (g *Game) CheckGuess(chatID, playerID int64, guess string) (string, bool, bool) {
 	gameConf, ok := g.games.Get(chatID)
 	if !ok {
-		return "", "", false
+		return "", false, false
 	}
 
 	if !gameConf.checkGuess(playerID, guess) {
-		return "", "", false
+		return "", false, false
 	}
 
 	word := gameConf.word
-	def := gameConf.def
+	hasDef := gameConf.hasDefinition()
 	gameConf.setNotActive()
 
-	return word, def, true
+	return word, hasDef, true
 }
 
 func (g *Game) NextWord(chatID, hostID int64) (string, bool, bool) {

@@ -14,6 +14,7 @@ import (
 
 var (
 	btnBecomeHost  = &i18n.Message{ID: "btn_become_host", Other: "Become a host"}
+	btnWhatsThat   = &i18n.Message{ID: "btn_whats_that", Other: "What is that?"}
 	btnSeeWord     = &i18n.Message{ID: "btn_see_word", Other: "See word"}
 	btnPeekDef     = &i18n.Message{ID: "btn_peek_definition", Other: "Peek definition"}
 	btnSkipWord    = &i18n.Message{ID: "btn_skip_word", Other: "Skip word"}
@@ -53,17 +54,18 @@ type Bot struct {
 	wdb  *WordDB
 	db   *DB
 	game *Game
+	dict *Dict
 	trs  map[string]*i18n.Localizer
 
 	packMenus    map[string]*tele.ReplyMarkup
 	langMenu     *tele.ReplyMarkup
-	hostMenus    map[string]*tele.ReplyMarkup
 	wordMenus    map[string]*tele.ReplyMarkup
 	wordDefMenus map[string]*tele.ReplyMarkup
 	trMenu       *tele.ReplyMarkup
+	chatGroup    *tele.Group
 }
 
-func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game) (*Bot, error) {
+func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict) (*Bot, error) {
 	pref := tele.Settings{
 		Token:  cfg.TgToken,
 		Poller: &tele.LongPoller{Timeout: 30 * time.Second},
@@ -79,17 +81,18 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game) (*Bot, error) {
 		wdb:  wdb,
 		db:   db,
 		game: game,
+		dict: dict,
 		trs:  make(map[string]*i18n.Localizer),
 
 		packMenus:    make(map[string]*tele.ReplyMarkup),
 		langMenu:     &tele.ReplyMarkup{},
-		hostMenus:    make(map[string]*tele.ReplyMarkup),
 		wordMenus:    make(map[string]*tele.ReplyMarkup),
 		wordDefMenus: make(map[string]*tele.ReplyMarkup),
 		trMenu:       &tele.ReplyMarkup{},
+		chatGroup:    b.Group(),
 	}
 
-	chatGroup := bot.bot.Group()
+	chatGroup := bot.chatGroup
 	chatGroup.Use(bot.checkChatGroup)
 
 	trRows := make([]tele.Row, 0, len(cfg.Translations))
@@ -150,15 +153,6 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game) (*Bot, error) {
 		bot.bot.Handle(&btn, bot.showWordPackMenu)
 	}
 	bot.langMenu.Inline(langRows...)
-
-	for _, tr := range cfg.Translations {
-		hostMenu := &tele.ReplyMarkup{}
-		hostBtn := hostMenu.Data(bot.tr(btnBecomeHost, tr.Locale), "become_host")
-		hostMenu.Inline(hostMenu.Row(hostBtn))
-		bot.hostMenus[tr.Locale] = hostMenu
-
-		chatGroup.Handle(&hostBtn, bot.assignGameHost)
-	}
 
 	for _, tr := range cfg.Translations {
 		wordMenu := &tele.ReplyMarkup{}
@@ -433,6 +427,16 @@ func (bot *Bot) assignGameHost(c tele.Context) error {
 		return err
 	}
 
+	menu := c.Message().ReplyMarkup
+	rowCount := len(menu.InlineKeyboard)
+	if rowCount > 0 {
+		menu.InlineKeyboard = menu.InlineKeyboard[1:]
+		err = c.Edit(menu, tele.ModeHTML)
+		if err != nil {
+			return err
+		}
+	}
+
 	lc = &i18n.LocalizeConfig{
 		DefaultMessage: msgNewHost,
 		TemplateData: map[string]string{
@@ -519,6 +523,38 @@ func (bot *Bot) showDefinition(c tele.Context) error {
 	})
 }
 
+func (bot *Bot) showOldDefinition(c tele.Context) error {
+	langPartWord := strings.Split(c.Data(), "|")
+	if len(langPartWord) < 3 {
+		return c.Respond()
+	}
+
+	def, err := bot.dict.FindDefinition(langPartWord[0], langPartWord[1], langPartWord[2])
+	if err != nil {
+		log.Println(err)
+		return c.Respond()
+	}
+
+	def = truncateDefinition(def, 1000)
+	def = langPartWord[2] + "\n\n" + def
+	err = c.Send(def)
+	if err != nil {
+		return err
+	}
+
+	menu := c.Message().ReplyMarkup
+	rowCount := len(menu.InlineKeyboard)
+	if rowCount > 0 {
+		menu.InlineKeyboard = menu.InlineKeyboard[:rowCount-1]
+		err = c.Edit(menu, tele.ModeHTML)
+		if err != nil {
+			return err
+		}
+	}
+
+	return c.Respond()
+}
+
 func (bot *Bot) skipWord(c tele.Context) error {
 	var text string
 	locale := bot.getLocale(c)
@@ -555,18 +591,9 @@ func (bot *Bot) skipWord(c tele.Context) error {
 }
 
 func (bot *Bot) checkGuess(c tele.Context) error {
-	word, def, guessed := bot.game.CheckGuess(c.Chat().ID, c.Sender().ID, c.Text())
+	word, hasDef, guessed := bot.game.CheckGuess(c.Chat().ID, c.Sender().ID, c.Text())
 	if !guessed {
 		return nil
-	}
-
-	if def != "" {
-		def = truncateDefinition(def, 1000)
-		def = word + "\n\n" + def
-		err := c.Send(def)
-		if err != nil {
-			return err
-		}
 	}
 
 	locale := bot.getLocale(c)
@@ -578,7 +605,26 @@ func (bot *Bot) checkGuess(c tele.Context) error {
 		},
 	}
 	msg := bot.trCfg(lc, locale)
-	return c.Send(msg, bot.hostMenus[locale], tele.ModeHTML)
+
+	hostMenu := &tele.ReplyMarkup{}
+	hostBtn := hostMenu.Data(bot.tr(btnBecomeHost, locale), "become_host")
+	bot.chatGroup.Handle(&hostBtn, bot.assignGameHost)
+	if hasDef {
+		cfg := bot.db.LoadChatConfig(c.Chat().ID)
+		pack, err := bot.wdb.GetWordPack(cfg.LangID, cfg.PackID)
+		if err == nil {
+			whatBtn := hostMenu.Data(bot.tr(btnWhatsThat, locale), "whats_that",
+				pack.langID, pack.part, word)
+			bot.chatGroup.Handle(&whatBtn, bot.showOldDefinition)
+			hostMenu.Inline(hostMenu.Row(hostBtn), hostMenu.Row(whatBtn))
+		} else {
+			hostMenu.Inline(hostMenu.Row(hostBtn))
+		}
+	} else {
+		hostMenu.Inline(hostMenu.Row(hostBtn))
+	}
+
+	return c.Send(msg, hostMenu, tele.ModeHTML)
 }
 
 func printUserName(c tele.Context) string {
