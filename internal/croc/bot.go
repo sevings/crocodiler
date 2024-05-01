@@ -472,19 +472,37 @@ func truncateDefinition(text string, maxLen int) string {
 		return text
 	}
 
-	text = text[:maxLen-1]
-	lastIdx := strings.LastIndexByte(text, '\n')
-	if lastIdx < maxLen/2 {
-		lastIdx = strings.LastIndexByte(text, '.')
-		if lastIdx < maxLen/2 {
-			lastIdx = strings.LastIndexByte(text, ' ')
-			if lastIdx < 0 {
-				lastIdx = maxLen - 1
+	runes := []rune(text)
+	if len(runes) <= maxLen {
+		return text
+	}
+	runes = runes[:maxLen-1]
+
+	splitters := []rune{'\n', '.', ' '}
+	for si, s := range splitters {
+		lastIdx := 0
+		for i := len(runes) - 1; i >= 0; i-- {
+			if runes[i] == s {
+				lastIdx = i
+				break
 			}
 		}
+
+		if si < len(splitters)-1 {
+			if lastIdx < maxLen/2 {
+				continue
+			}
+		} else {
+			if lastIdx <= 0 {
+				continue
+			}
+		}
+
+		runes = runes[:lastIdx]
+		break
 	}
 
-	return text[:lastIdx] + "…"
+	return string(runes) + "…"
 }
 
 func (bot *Bot) showDefinition(c tele.Context) error {
