@@ -10,6 +10,7 @@ require (
 	github.com/knadh/koanf/providers/file v0.1.0
 	github.com/knadh/koanf/v2 v2.1.1
 	github.com/nicksnyder/go-i18n/v2 v2.4.0
+	go.etcd.io/bbolt v1.3.9
 	golang.org/x/text v0.14.0
 	gopkg.in/telebot.v3 v3.2.1
 	gorm.io/gorm v1.25.9
@@ -21,7 +22,6 @@ require (
 	github.com/glebarez/go-sqlite v1.22.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.0.0-alpha.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/ianlewis/go-stardict v0.0.0-20210604091657-cf3773cabea2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/knadh/koanf/maps v0.1.1 // indirect
@@ -29,10 +29,8 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
-	github.com/pebbe/dictzip v1.0.1 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	go.etcd.io/bbolt v1.3.9 // indirect
 	golang.org/x/sys v0.19.0 // indirect
 	modernc.org/libc v1.49.2 // indirect
 	modernc.org/mathutil v1.6.0 // indirect

@@ -2,15 +2,25 @@ package helper
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
-	"github.com/ianlewis/go-stardict"
-	"github.com/ianlewis/go-stardict/dict"
 	bolt "go.etcd.io/bbolt"
 	"log"
 	"os"
-	"regexp"
 	"strings"
 )
+
+type wordDef struct {
+	Word     string
+	Pos      string
+	LangCode string `json:"lang_code"`
+	Title    string
+	Redirect string
+	Senses   []struct {
+		Glosses    []string
+		RawGlosses []string `json:"raw_glosses"`
+	}
+}
 
 func UpdateDictionary() {
 	cfg, err := LoadConfig()
@@ -30,26 +40,10 @@ func UpdateDictionary() {
 	}(db)
 
 	for _, lang := range cfg.Languages {
-		sd, err := stardict.Open(lang.Dict.Path)
+		lu, err := newLangUpdater(db, lang)
 		if err != nil {
 			log.Println(err)
-		}
-
-		lu := langUpdater{
-			db:      db,
-			sd:      sd,
-			langID:  lang.ID,
-			pattern: lang.Dict.Pattern,
-			linkRe:  regexp.MustCompile(`https?://[\w\-./?#]+:?`),
-			htmlEsc: strings.NewReplacer(
-				"&lt;", "<",
-				"&gt;", ">",
-				"&#34;", "\"",
-				"&#39;", "'",
-				"<br>", "\n",
-				"", "\r",
-				"&amp;", "&",
-			),
+			continue
 		}
 
 		for _, pack := range lang.WordPacks {
@@ -63,12 +57,90 @@ func UpdateDictionary() {
 
 type langUpdater struct {
 	db      *bolt.DB
-	sd      *stardict.Stardict
 	langID  string
-	pattern string
+	allDefs map[string]*wordDef
+}
 
-	linkRe  *regexp.Regexp
-	htmlEsc *strings.Replacer
+func newLangUpdater(db *bolt.DB, lang LanguageConfig) (*langUpdater, error) {
+	allDefs := make(map[string]*wordDef)
+
+	fmt.Printf("Loading dictionary from file %s...\n", lang.Dict.Path)
+	file, err := os.Open(lang.Dict.Path)
+	if err != nil {
+		return nil, err
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}(file)
+
+	var wordCount int
+	scanner := bufio.NewScanner(file)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+	for scanner.Scan() {
+		defJson := scanner.Text()
+		wd := &wordDef{}
+		err = json.Unmarshal([]byte(defJson), wd)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		if wd.LangCode != "" && wd.LangCode != lang.ID {
+			continue
+		}
+
+		if len(wd.Senses) == 0 && wd.Word != "" {
+			continue
+		}
+
+		var key string
+		if wd.Word != "" {
+			if lang.Dict.Parts {
+				key = wd.Pos + "/" + wd.Word
+			} else {
+				key = wd.Word
+			}
+		} else {
+			key = "redirect/" + wd.Title
+		}
+
+		prevDef, exist := allDefs[key]
+		if exist {
+			prevDef.Senses = append(prevDef.Senses, wd.Senses...)
+			continue
+		}
+
+		allDefs[key] = wd
+		allDefs["low/"+strings.ToLower(key)] = wd
+		if wd.Word != "" && lang.Dict.Parts {
+			key = "any-pos/" + wd.Word
+			allDefs[key] = wd
+			allDefs["low/"+strings.ToLower(key)] = wd
+		}
+		wordCount++
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Println(err)
+	}
+
+	if wordCount == 0 {
+		return nil, fmt.Errorf("Dictionary in %s is empty\n", lang.Dict.Path)
+	}
+
+	fmt.Printf("Loaded %d words.\n", wordCount)
+
+	lu := langUpdater{
+		db:      db,
+		langID:  lang.ID,
+		allDefs: allDefs,
+	}
+
+	return &lu, err
 }
 
 func (lu langUpdater) updateWordPack(pack WordPackConfig) error {
@@ -84,12 +156,6 @@ func (lu langUpdater) updateWordPack(pack WordPackConfig) error {
 			log.Println(err)
 		}
 	}(file)
-
-	pattern := fmt.Sprintf(lu.pattern, pack.Part)
-	defRe, err := regexp.Compile(pattern)
-	if err != nil {
-		return err
-	}
 
 	words := make([]string, 0, 200)
 
@@ -120,15 +186,17 @@ func (lu langUpdater) updateWordPack(pack WordPackConfig) error {
 		return err
 	}
 
-	bkt, err = bkt.CreateBucketIfNotExists([]byte(pack.Part))
-	if err != nil {
-		return err
+	if pack.Part != "" {
+		bkt, err = bkt.CreateBucketIfNotExists([]byte(pack.Part))
+		if err != nil {
+			return err
+		}
 	}
 
 	var updated, notFound int
 
 	for _, word := range words {
-		def, err := lu.findDefinition(word, defRe)
+		def, err := lu.findDefinition(word, pack.Part)
 		if err != nil {
 			log.Println(err)
 			notFound++
@@ -150,49 +218,65 @@ func (lu langUpdater) updateWordPack(pack WordPackConfig) error {
 	return tx.Commit()
 }
 
-func (lu langUpdater) findDefinition(query string, re *regexp.Regexp) (string, error) {
-	entries, err := lu.sd.Search(query)
-	if err != nil {
-		return "", err
+func (lu langUpdater) findDefinition(query, pos string) (string, error) {
+	var key string
+	if pos == "" {
+		key = query
+	} else {
+		key = pos + "/" + query
 	}
-
-	var sde *stardict.Entry
-	for _, entry := range entries {
-		if entry.Title() == query {
-			sde = entry
-			break
+	wd, found := lu.allDefs[key]
+	if !found {
+		wd, found = lu.allDefs["low/"+strings.ToLower(key)]
+	}
+	if !found {
+		key = "redirect/" + query
+		wd, found = lu.allDefs[key]
+		if !found {
+			wd, found = lu.allDefs["low/"+strings.ToLower(key)]
+		}
+		if found {
+			if pos == "" {
+				key = wd.Redirect
+			} else {
+				key = pos + "/" + wd.Redirect
+			}
+			wd, found = lu.allDefs[key]
 		}
 	}
+	if !found && pos != "" {
+		key = "any-pos/" + query
+		wd, found = lu.allDefs[key]
+		if !found {
+			wd, found = lu.allDefs["low/"+strings.ToLower(key)]
+		}
+	}
+	if !found {
+		return "", fmt.Errorf("definition of word '%s' not found", query)
+	}
 
-	if sde == nil {
-		query = strings.ToLower(query)
-		for _, entry := range entries {
-			if strings.ToLower(entry.Title()) == query {
-				sde = entry
-				break
+	var def string
+	if len(wd.Senses) == 1 {
+		if len(wd.Senses[0].RawGlosses) > 0 {
+			def = wd.Senses[0].RawGlosses[0]
+		} else if len(wd.Senses[0].Glosses) > 0 {
+			def = wd.Senses[0].Glosses[0]
+		} else {
+			return "", fmt.Errorf("no glosses exist for word %s", query)
+		}
+	} else {
+		for i := range wd.Senses {
+			var sense string
+			if len(wd.Senses[i].RawGlosses) > 0 {
+				sense = wd.Senses[i].RawGlosses[0]
+			} else if len(wd.Senses[i].Glosses) > 0 {
+				sense = wd.Senses[i].Glosses[0]
+			}
+			if sense != "" {
+				def += fmt.Sprintf("%d) %s\n", i+1, sense)
 			}
 		}
 	}
 
-	if sde != nil {
-		for _, data := range sde.Data() {
-			switch data.Type {
-			case dict.UTFTextType:
-				def := string(data.Data)
-				if re != nil {
-					match := re.FindStringSubmatch(def)
-					if len(match) > 1 {
-						def = match[1]
-					}
-				}
-				def = strings.TrimSpace(def)
-				def = lu.linkRe.ReplaceAllString(def, "")
-				def = lu.htmlEsc.Replace(def)
-				return def, nil
-			default:
-			}
-		}
-	}
-
-	return "", fmt.Errorf("definition of word '%s' not found", query)
+	return def, nil
 }

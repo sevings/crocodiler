@@ -18,8 +18,8 @@ type LanguageConfig struct {
 }
 
 type DictConfig struct {
-	Path    string
-	Pattern string
+	Path  string
+	Parts bool
 }
 
 type WordPackConfig struct {

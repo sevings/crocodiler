@@ -29,7 +29,7 @@ func (d *Dict) FindDefinition(lang, part, query string) (string, error) {
 	defer func() { _ = tx.Rollback() }()
 
 	bkt := tx.Bucket([]byte(lang))
-	if bkt != nil {
+	if bkt != nil && part != "" {
 		bkt = bkt.Bucket([]byte(part))
 	}
 	if bkt == nil {
