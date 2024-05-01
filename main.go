@@ -9,9 +9,9 @@ import (
 	"os/signal"
 )
 
-const botArg = "bot"
-const helpArg = "help"
-const dictArg = "dict"
+const botArg = "--bot"
+const helpArg = "--help"
+const dictArg = "--dict"
 
 func printHelp() {
 	log.Printf(
@@ -81,7 +81,7 @@ func runBot() {
 	defer dict.Close()
 
 	game := croc.NewGame(db, wdb, dict, cfg.GameExp)
-	bot, err := croc.NewBot(cfg, wdb, db, game)
+	bot, err := croc.NewBot(cfg, wdb, db, game, dict)
 	if err != nil {
 		panic(err)
 	}
