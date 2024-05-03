@@ -10,11 +10,13 @@ import (
 
 type aiChat struct {
 	messages []llms.MessageContent
+	maxHst   int
 }
 
-func newAiChat(prompt string) *aiChat {
+func newAiChat(prompt string, maxHistory int) *aiChat {
 	ai := &aiChat{
 		messages: make([]llms.MessageContent, 0, 3),
+		maxHst:   maxHistory,
 	}
 
 	ai.addMessage(llms.ChatMessageTypeSystem, prompt)
@@ -31,6 +33,14 @@ func (chat *aiChat) addMessage(role llms.ChatMessageType, text string) {
 	part := llms.TextPart(text)
 	msg.Parts = append(msg.Parts, part)
 	chat.messages = append(chat.messages, msg)
+
+	if chat.maxHst > 4 && len(chat.messages) > chat.maxHst {
+		rmCount := chat.maxHst / 4
+		if rmCount%2 != 0 {
+			rmCount++
+		}
+		chat.messages = append(chat.messages[:1], chat.messages[rmCount+1:]...)
+	}
 }
 
 func (chat *aiChat) addUserMessage(text string) {
@@ -50,6 +60,8 @@ type AI struct {
 	prompts map[string]string
 	chats   map[int64]*aiChat
 	opts    []llms.CallOption
+	maxHst  int
+	maxInp  int
 }
 
 func NewAI(cfg AiConfig) (*AI, error) {
@@ -57,6 +69,8 @@ func NewAI(cfg AiConfig) (*AI, error) {
 		prompts: make(map[string]string),
 		chats:   make(map[int64]*aiChat),
 		opts:    make([]llms.CallOption, 0),
+		maxHst:  cfg.MaxHst,
+		maxInp:  cfg.MaxInp,
 	}
 
 	var err error
@@ -94,6 +108,7 @@ func NewAI(cfg AiConfig) (*AI, error) {
 
 	ai.opts = append(ai.opts, llms.WithTemperature(cfg.Temp))
 	ai.opts = append(ai.opts, llms.WithMaxTokens(cfg.MaxTok))
+	ai.opts = append(ai.opts, llms.WithStopWords(cfg.Stop))
 
 	return ai, nil
 }
@@ -108,7 +123,7 @@ func (ai *AI) StartChat(userID int64, langID string) bool {
 		return false
 	}
 
-	ai.chats[userID] = newAiChat(pmt)
+	ai.chats[userID] = newAiChat(pmt, ai.maxHst)
 	return true
 }
 
@@ -127,6 +142,10 @@ func (ai *AI) StopChat(userID int64) {
 }
 
 func (ai *AI) SendMessage(userID int64, text string) (string, error) {
+	if len(text) > ai.maxInp {
+		return "", fmt.Errorf("message from user %d is too long", userID)
+	}
+
 	chat := ai.chats[userID]
 	if chat == nil {
 		return "", fmt.Errorf("chat for user %d does not exist", userID)

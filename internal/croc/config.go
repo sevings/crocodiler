@@ -26,6 +26,9 @@ type AiConfig struct {
 	Model    string
 	Temp     float64
 	MaxTok   int `koanf:"max_tok"`
+	MaxHst   int `koanf:"max_hst"`
+	Stop     []string
+	MaxInp   int `koanf:"max_inp"`
 }
 
 type DefaultConfig struct {

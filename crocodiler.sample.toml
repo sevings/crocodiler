@@ -10,6 +10,9 @@ provider = "openai" # or mistral
 model    = "gpt-3.5-turbo"
 temp     = 0
 max_tok  = 15
+max_hst  = 30
+stop     = [ "\n", "." , "!" ]
+max_inp  = 500
 
 [default_cfg]
 locale  = "en"
