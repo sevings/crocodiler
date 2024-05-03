@@ -3,9 +3,11 @@ package croc
 import (
 	"context"
 	"fmt"
+	"github.com/erni27/imcache"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/mistral"
 	"github.com/tmc/langchaingo/llms/openai"
+	"time"
 )
 
 type aiChat struct {
@@ -58,19 +60,20 @@ func (chat *aiChat) clear() {
 type AI struct {
 	llm     llms.Model
 	prompts map[string]string
-	chats   map[int64]*aiChat
+	chats   imcache.Cache[int64, *aiChat]
 	opts    []llms.CallOption
 	maxHst  int
 	maxInp  int
+	chatExp imcache.Expiration
 }
 
-func NewAI(cfg AiConfig) (*AI, error) {
+func NewAI(cfg AiConfig, exp time.Duration) (*AI, error) {
 	ai := &AI{
 		prompts: make(map[string]string),
-		chats:   make(map[int64]*aiChat),
 		opts:    make([]llms.CallOption, 0),
 		maxHst:  cfg.MaxHst,
 		maxInp:  cfg.MaxInp,
+		chatExp: imcache.WithSlidingExpiration(exp),
 	}
 
 	var err error
@@ -123,12 +126,13 @@ func (ai *AI) StartChat(userID int64, langID string) bool {
 		return false
 	}
 
-	ai.chats[userID] = newAiChat(pmt, ai.maxHst)
+	chat := newAiChat(pmt, ai.maxHst)
+	ai.chats.Set(userID, chat, ai.chatExp)
 	return true
 }
 
 func (ai *AI) ClearChar(userID int64) error {
-	chat, ok := ai.chats[userID]
+	chat, ok := ai.chats.Get(userID)
 	if !ok {
 		return fmt.Errorf("chat for user %d does not exist", userID)
 	}
@@ -138,7 +142,7 @@ func (ai *AI) ClearChar(userID int64) error {
 }
 
 func (ai *AI) StopChat(userID int64) {
-	delete(ai.chats, userID)
+	ai.chats.Remove(userID)
 }
 
 func (ai *AI) SendMessage(userID int64, text string) (string, error) {
@@ -146,8 +150,8 @@ func (ai *AI) SendMessage(userID int64, text string) (string, error) {
 		return "", fmt.Errorf("message from user %d is too long", userID)
 	}
 
-	chat := ai.chats[userID]
-	if chat == nil {
+	chat, ok := ai.chats.Get(userID)
+	if !ok {
 		return "", fmt.Errorf("chat for user %d does not exist", userID)
 	}
 

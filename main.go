@@ -80,7 +80,7 @@ func runBot() {
 	}
 	defer dict.Close()
 
-	ai, err := croc.NewAI(cfg.Ai)
+	ai, err := croc.NewAI(cfg.Ai, cfg.GameExp)
 	if err != nil {
 		panic(err)
 	}
