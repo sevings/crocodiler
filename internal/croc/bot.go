@@ -613,7 +613,13 @@ func (bot *Bot) checkGuess(c tele.Context) error {
 	guesser := c.Sender()
 
 	if c.Chat().Type == tele.ChatPrivate {
-		reply, err := bot.ai.SendMessage(c.Sender().ID, c.Message().Text)
+		text := c.Message().Text
+		if c.Message().ReplyTo != nil {
+			replied := c.Message().ReplyTo.Text
+			replied = "> " + strings.ReplaceAll(replied, "\n", "\n> ")
+			text = replied + "\n\n" + text
+		}
+		reply, err := bot.ai.SendMessage(c.Sender().ID, text)
 		if err != nil {
 			log.Println(err)
 			return nil
