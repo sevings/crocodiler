@@ -3,6 +3,14 @@ db = "data/db.sqlite"
 game_exp = "72h"
 dict_path = "data/dict.db"
 
+[ai]
+provider = "openai" # or mistral
+#base_url = "http://127.0.0.1:8080"
+#api_key  = "your_open_ai_token"
+model    = "gpt-3.5-turbo"
+temp     = 0
+max_tok  = 15
+
 [default_cfg]
 locale  = "en"
 lang_id = "en"
@@ -21,6 +29,7 @@ path   = "i18n/active.ru.toml"
 [[languages]]
 id   = "en"
 name = "English"
+prompt = "I want you to act as a player of word guessing game. I will think of a word and try to explain its meaning to you. You will guess the word and reply your assumption to me. I want you to reply with only one word which is your guess and nothing else. If your guess is incorrect, I will add more information."
 
 #[[languages.word_packs]]
 #id   = "A1"

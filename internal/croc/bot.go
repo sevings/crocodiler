@@ -18,7 +18,7 @@ var (
 	btnSeeWord     = &i18n.Message{ID: "btn_see_word", Other: "See word"}
 	btnPeekDef     = &i18n.Message{ID: "btn_peek_definition", Other: "Peek definition"}
 	btnSkipWord    = &i18n.Message{ID: "btn_skip_word", Other: "Skip word"}
-	msgAddToGroup  = &i18n.Message{ID: "msg_add_to_group", Other: "Add me to a group chat to play with friends."}
+	msgChangeLang  = &i18n.Message{ID: "msg_change_lang", Other: "This language is not yet supported in single player mode."}
 	msgLangChanged = &i18n.Message{ID: "msg_lang_changed", Other: "Language changed."}
 	msgNewWord     = &i18n.Message{ID: "msg_new_word", Other: "Your new word is \"{{.word}}\"."}
 	msgCurrPack    = &i18n.Message{
@@ -55,6 +55,7 @@ type Bot struct {
 	db   *DB
 	game *Game
 	dict *Dict
+	ai   *AI
 	trs  map[string]*i18n.Localizer
 
 	packMenus    map[string]*tele.ReplyMarkup
@@ -62,10 +63,9 @@ type Bot struct {
 	wordMenus    map[string]*tele.ReplyMarkup
 	wordDefMenus map[string]*tele.ReplyMarkup
 	trMenu       *tele.ReplyMarkup
-	chatGroup    *tele.Group
 }
 
-func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict) (*Bot, error) {
+func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict, ai *AI) (*Bot, error) {
 	pref := tele.Settings{
 		Token:  cfg.TgToken,
 		Poller: &tele.LongPoller{Timeout: 30 * time.Second},
@@ -82,6 +82,7 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict) (*Bot, erro
 		db:   db,
 		game: game,
 		dict: dict,
+		ai:   ai,
 		trs:  make(map[string]*i18n.Localizer),
 
 		packMenus:    make(map[string]*tele.ReplyMarkup),
@@ -89,11 +90,7 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict) (*Bot, erro
 		wordMenus:    make(map[string]*tele.ReplyMarkup),
 		wordDefMenus: make(map[string]*tele.ReplyMarkup),
 		trMenu:       &tele.ReplyMarkup{},
-		chatGroup:    b.Group(),
 	}
-
-	chatGroup := bot.chatGroup
-	chatGroup.Use(bot.checkChatGroup)
 
 	trRows := make([]tele.Row, 0, len(cfg.Translations))
 	for _, tr := range cfg.Translations {
@@ -166,9 +163,9 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict) (*Bot, erro
 		wordDefMenu.Inline(wordDefMenu.Row(seeBtn), wordDefMenu.Row(defBtn), wordDefMenu.Row(skipBtn))
 		bot.wordDefMenus[tr.Locale] = wordDefMenu
 
-		chatGroup.Handle(&seeBtn, bot.showWord)
-		chatGroup.Handle(&defBtn, bot.showDefinition)
-		chatGroup.Handle(&skipBtn, bot.skipWord)
+		bot.bot.Handle(&seeBtn, bot.showWord)
+		bot.bot.Handle(&defBtn, bot.showDefinition)
+		bot.bot.Handle(&skipBtn, bot.skipWord)
 	}
 
 	if _, ok := bot.trs[cfg.DefaultCfg.Locale]; !ok {
@@ -190,11 +187,11 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict) (*Bot, erro
 	bot.bot.Handle("/language", bot.showTrMenu)
 	bot.bot.Handle(tele.OnAddedToGroup, bot.showTrMenu)
 	bot.bot.Handle("/help", bot.showHelp)
+	bot.bot.Handle("/play", bot.playNewGame)
 
-	chatGroup.Handle("/word_pack", bot.showLangMenu)
-	chatGroup.Handle("/play", bot.playNewGame)
-	chatGroup.Handle("/stop", bot.stopGame)
-	chatGroup.Handle(tele.OnText, bot.checkGuess)
+	bot.bot.Handle("/word_pack", bot.showLangMenu)
+	bot.bot.Handle("/stop", bot.stopGame)
+	bot.bot.Handle(tele.OnText, bot.checkGuess)
 
 	return bot, nil
 }
@@ -242,16 +239,6 @@ func (bot *Bot) trCfg(lc *i18n.LocalizeConfig, locale string) string {
 	return msg
 }
 
-func (bot *Bot) checkChatGroup(next tele.HandlerFunc) tele.HandlerFunc {
-	return func(c tele.Context) error {
-		if c.Chat().Type == tele.ChatPrivate {
-			return c.Send(bot.tr(msgAddToGroup, bot.getLocale(c)))
-		}
-
-		return next(c)
-	}
-}
-
 func (bot *Bot) showTrMenu(c tele.Context) error {
 	msg := "Select language."
 
@@ -269,12 +256,7 @@ func (bot *Bot) changeTr(c tele.Context) error {
 
 	msg := bot.tr(msgRules, locale)
 	msg += "\n\n"
-
-	if c.Chat().Type == tele.ChatPrivate {
-		msg += bot.tr(msgAddToGroup, locale)
-	} else {
-		msg += bot.tr(msgHelp, locale)
-	}
+	msg += bot.tr(msgHelp, locale)
 
 	return c.Edit(msg)
 }
@@ -284,18 +266,28 @@ func (bot *Bot) showHelp(c tele.Context) error {
 
 	msg := bot.tr(msgRules, locale)
 	msg += "\n\n"
-
-	if c.Chat().Type == tele.ChatPrivate {
-		msg += bot.tr(msgAddToGroup, locale)
-	} else {
-		msg += bot.tr(msgHelp, locale)
-	}
+	msg += bot.tr(msgHelp, locale)
 
 	return c.Send(msg)
 }
 
 func (bot *Bot) changeWordPack(c tele.Context) error {
 	langPack := strings.Split(c.Data(), "|")
+	if c.Chat().Type == tele.ChatPrivate {
+		ok := bot.ai.StartChat(c.Sender().ID, langPack[0])
+		if !ok {
+			err := c.Respond(&tele.CallbackResponse{
+				Text:      bot.tr(msgChangeLang, bot.getLocale(c)),
+				ShowAlert: true,
+			})
+			if err != nil {
+				return err
+			}
+
+			return bot.showLangMenu(c)
+		}
+	}
+
 	word, hasDef, err := bot.game.SetWordPack(c.Chat().ID, c.Sender().ID, langPack[0], langPack[1])
 	if err != nil {
 		log.Println(err)
@@ -373,6 +365,14 @@ func (bot *Bot) showLangMenu(c tele.Context) error {
 }
 
 func (bot *Bot) playNewGame(c tele.Context) error {
+	if c.Chat().Type == tele.ChatPrivate {
+		cfg := bot.db.LoadChatConfig(c.Sender().ID)
+		started := bot.ai.StartChat(c.Sender().ID, cfg.LangID)
+		if !started {
+			return c.Send(bot.tr(msgChangeLang, bot.getLocale(c)))
+		}
+	}
+
 	locale := bot.getLocale(c)
 	hasDef, err := bot.game.Play(c.Chat().ID, c.Sender().ID)
 	if err != nil {
@@ -384,7 +384,7 @@ func (bot *Bot) playNewGame(c tele.Context) error {
 	lc := &i18n.LocalizeConfig{
 		DefaultMessage: msgNewHost,
 		TemplateData: map[string]string{
-			"name": printUserName(c),
+			"name": printUserName(c.Sender()),
 		},
 	}
 	msg := bot.trCfg(lc, locale)
@@ -395,6 +395,10 @@ func (bot *Bot) playNewGame(c tele.Context) error {
 }
 
 func (bot *Bot) stopGame(c tele.Context) error {
+	if c.Chat().Type == tele.ChatPrivate {
+		bot.ai.StopChat(c.Sender().ID)
+	}
+
 	ok := bot.game.Stop(c.Chat().ID, c.Sender().ID)
 	if !ok {
 		return c.Send(bot.tr(msgNotHost, bot.getLocale(c)))
@@ -411,6 +415,13 @@ func (bot *Bot) assignGameHost(c tele.Context) error {
 			Text:      bot.tr(msgGameActive, locale),
 			ShowAlert: true,
 		})
+	}
+
+	if c.Chat().Type == tele.ChatPrivate {
+		err := bot.ai.ClearChar(c.Sender().ID)
+		if err != nil {
+			log.Println(err)
+		}
 	}
 
 	lc := &i18n.LocalizeConfig{
@@ -440,7 +451,7 @@ func (bot *Bot) assignGameHost(c tele.Context) error {
 	lc = &i18n.LocalizeConfig{
 		DefaultMessage: msgNewHost,
 		TemplateData: map[string]string{
-			"name": printUserName(c),
+			"name": printUserName(c.Sender()),
 		},
 	}
 	msg := bot.trCfg(lc, locale)
@@ -584,6 +595,13 @@ func (bot *Bot) skipWord(c tele.Context) error {
 		}
 	}
 
+	if c.Chat().Type == tele.ChatPrivate {
+		err := bot.ai.ClearChar(c.Sender().ID)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
 	return c.Respond(&tele.CallbackResponse{
 		Text:      text,
 		ShowAlert: true,
@@ -591,7 +609,26 @@ func (bot *Bot) skipWord(c tele.Context) error {
 }
 
 func (bot *Bot) checkGuess(c tele.Context) error {
-	word, hasDef, guessed := bot.game.CheckGuess(c.Chat().ID, c.Sender().ID, c.Text())
+	guess := c.Text()
+	guesser := c.Sender()
+
+	if c.Chat().Type == tele.ChatPrivate {
+		reply, err := bot.ai.SendMessage(c.Sender().ID, c.Message().Text)
+		if err != nil {
+			log.Println(err)
+			return nil
+		}
+
+		err = c.Send(reply)
+		if err != nil {
+			return err
+		}
+
+		guess = reply
+		guesser = bot.bot.Me
+	}
+
+	word, hasDef, guessed := bot.game.CheckGuess(c.Chat().ID, guesser.ID, guess)
 	if !guessed {
 		return nil
 	}
@@ -600,7 +637,7 @@ func (bot *Bot) checkGuess(c tele.Context) error {
 	lc := &i18n.LocalizeConfig{
 		DefaultMessage: msgGuessedWord,
 		TemplateData: map[string]string{
-			"name": printUserName(c),
+			"name": printUserName(guesser),
 			"word": word,
 		},
 	}
@@ -608,14 +645,14 @@ func (bot *Bot) checkGuess(c tele.Context) error {
 
 	hostMenu := &tele.ReplyMarkup{}
 	hostBtn := hostMenu.Data(bot.tr(btnBecomeHost, locale), "become_host")
-	bot.chatGroup.Handle(&hostBtn, bot.assignGameHost)
+	bot.bot.Handle(&hostBtn, bot.assignGameHost)
 	if hasDef {
 		cfg := bot.db.LoadChatConfig(c.Chat().ID)
 		pack, err := bot.wdb.GetWordPack(cfg.LangID, cfg.PackID)
 		if err == nil {
 			whatBtn := hostMenu.Data(bot.tr(btnWhatsThat, locale), "whats_that",
 				pack.langID, pack.part, word)
-			bot.chatGroup.Handle(&whatBtn, bot.showOldDefinition)
+			bot.bot.Handle(&whatBtn, bot.showOldDefinition)
 			hostMenu.Inline(hostMenu.Row(hostBtn), hostMenu.Row(whatBtn))
 		} else {
 			hostMenu.Inline(hostMenu.Row(hostBtn))
@@ -627,8 +664,7 @@ func (bot *Bot) checkGuess(c tele.Context) error {
 	return c.Send(msg, hostMenu, tele.ModeHTML)
 }
 
-func printUserName(c tele.Context) string {
-	user := c.Sender()
+func printUserName(user *tele.User) string {
 	if user.LastName == "" {
 		return fmt.Sprintf("<b>%s</b>",
 			user.FirstName)

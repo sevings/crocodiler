@@ -18,9 +18,9 @@ other = "Пропустить слово"
 hash = "sha1-d8baec73fa9eedff47765cc75f74654a5830aeb7"
 other = "Что это такое?"
 
-[msg_add_to_group]
-hash = "sha1-16348f9eed5a413ae0ff5f64ba8e5635fbc2b7b5"
-other = "Добавьте меня в группу, чтобы играть с друзьями."
+[msg_change_lang]
+hash = "sha1-996188068c7291c2f07967ff9d0308fa5c8fa113"
+other = "Этот язык в режиме одиночной игры пока не поддерживается."
 
 [msg_curr_lang]
 hash = "sha1-caddcd67e6c10ca3d14f09d67cd04e55180e3e54"

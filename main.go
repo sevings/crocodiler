@@ -80,8 +80,18 @@ func runBot() {
 	}
 	defer dict.Close()
 
+	ai, err := croc.NewAI(cfg.Ai)
+	if err != nil {
+		panic(err)
+	}
+	for _, lang := range cfg.Languages {
+		if lang.Prompt != "" {
+			ai.SetPrompt(lang.ID, lang.Prompt)
+		}
+	}
+
 	game := croc.NewGame(db, wdb, dict, cfg.GameExp)
-	bot, err := croc.NewBot(cfg, wdb, db, game, dict)
+	bot, err := croc.NewBot(cfg, wdb, db, game, dict, ai)
 	if err != nil {
 		panic(err)
 	}

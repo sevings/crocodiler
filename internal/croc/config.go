@@ -9,13 +9,23 @@ import (
 )
 
 type Config struct {
-	TgToken      string        `koanf:"tg_token"`
-	DBPath       string        `koanf:"db_path"`
-	DictPath     string        `koanf:"dict_path"`
+	TgToken      string `koanf:"tg_token"`
+	DBPath       string `koanf:"db_path"`
+	DictPath     string `koanf:"dict_path"`
+	Ai           AiConfig
 	GameExp      time.Duration `koanf:"game_exp"`
 	DefaultCfg   DefaultConfig `koanf:"default_cfg"`
 	Translations []TranslationConfig
 	Languages    []LanguageConfig
+}
+
+type AiConfig struct {
+	Provider string
+	BaseUrl  string `koanf:"base_url"`
+	ApiKey   string `koanf:"api_key"`
+	Model    string
+	Temp     float64
+	MaxTok   int `koanf:"max_tok"`
 }
 
 type DefaultConfig struct {
@@ -33,6 +43,7 @@ type TranslationConfig struct {
 type LanguageConfig struct {
 	ID        string
 	Name      string
+	Prompt    string
 	WordPacks []WordPackConfig `koanf:"word_packs"`
 }
 
