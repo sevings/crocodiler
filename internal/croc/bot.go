@@ -49,8 +49,10 @@ var (
 		"The game host receives a random word and explains it to the other participants " +
 		"without using the same root words. " +
 		"Then, everyone tries to guess the word. " +
-		"When some player sends the correct guess, the game ends. " +
-		"Anyone can take on the role of the new game host, and we start from the beginning."}
+		"When some player sends the correct guess, the game ends.\n\n" +
+		"You can add me to a group and play with friends, " +
+		"or you can play against the AI in single player mode. " +
+		"There are several languages and difficulty levels available."}
 	msgShutdown = &i18n.Message{ID: "msg_shutdown", Other: "The bot is about to update. It usually takes few minutes."}
 )
 

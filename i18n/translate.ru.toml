@@ -1,0 +1,3 @@
+[msg_rules]
+hash = "sha1-1ee45978382a7079eaa0e209be82759d7fbdfca0"
+other = "Hello! I am a bot created to play a word guessing game.\n\nThe rules are simple. There is a game host and multiple players. The game host receives a random word and explains it to the other participants without using the same root words. Then, everyone tries to guess the word. When some player sends the correct guess, the game ends.\n\nYou can add me to a group and play with friends, or you can play against the AI in single player mode. There are several languages and difficulty levels available."
