@@ -648,6 +648,10 @@ func (bot *Bot) skipWord(c tele.Context) error {
 }
 
 func (bot *Bot) checkGuess(c tele.Context) error {
+	if !bot.game.IsActive(c.Chat().ID) {
+		return nil
+	}
+
 	guess := c.Text()
 	guesser := c.Sender()
 

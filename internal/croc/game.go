@@ -264,6 +264,11 @@ func (g *Game) GetDefinition(chatID, playerID int64) (string, bool) {
 	return gameConf.def, true
 }
 
+func (g *Game) IsActive(chatID int64) bool {
+	gameConf, ok := g.games.Get(chatID)
+	return ok && gameConf.isActive()
+}
+
 func (g *Game) GetActiveGames() []int64 {
 	var chatIDs []int64
 
