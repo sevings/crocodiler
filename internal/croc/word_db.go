@@ -2,8 +2,7 @@ package croc
 
 import (
 	"bufio"
-	"fmt"
-	"log"
+	"go.uber.org/zap"
 	"math/rand"
 	"os"
 	"strings"
@@ -33,15 +32,16 @@ func (pack *WordPack) GetPart() string {
 	return pack.part
 }
 
-func loadWordPack(langID, packID, path, part string) (*WordPack, error) {
+func (db *WordDB) loadWordPackImp(langID, packID, path, part string) (*WordPack, bool) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		db.log.Error(err)
+		return nil, false
 	}
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			log.Println(err)
+			db.log.Warn(err)
 		}
 	}(file)
 
@@ -61,14 +61,17 @@ func loadWordPack(langID, packID, path, part string) (*WordPack, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		db.log.Error(err)
+		return nil, false
 	}
 
 	if len(pack.words) == 0 {
-		return nil, fmt.Errorf("word pack in %s is empty", path)
+		db.log.Errorw("word pack is empty",
+			"path", path)
+		return nil, false
 	}
 
-	return pack, nil
+	return pack, true
 }
 
 type WordDB struct {
@@ -77,6 +80,7 @@ type WordDB struct {
 	langNames map[string]string
 	packNames map[string]map[string]string
 	packs     map[string]map[string]*WordPack
+	log       *zap.SugaredLogger
 }
 
 func NewWordDB() *WordDB {
@@ -86,6 +90,7 @@ func NewWordDB() *WordDB {
 		langNames: make(map[string]string),
 		packNames: make(map[string]map[string]string),
 		packs:     make(map[string]map[string]*WordPack),
+		log:       zap.L().Named("word_db").Sugar(),
 	}
 }
 
@@ -93,50 +98,58 @@ func (db *WordDB) GetLanguageIDs() []string {
 	return db.langIDs
 }
 
-func (db *WordDB) GetWordPackIDs(langID string) ([]string, error) {
+func (db *WordDB) GetWordPackIDs(langID string) ([]string, bool) {
 	names, ok := db.packIDs[langID]
 	if !ok {
-		return nil, fmt.Errorf("language %s does not exist", langID)
+		db.log.Errorw("language doesn't exist", "lang_id", langID)
+		return nil, false
 	}
 
-	return names, nil
+	return names, true
 }
 
-func (db *WordDB) GetLanguageName(langID string) (string, error) {
+func (db *WordDB) GetLanguageName(langID string) (string, bool) {
 	name, ok := db.langNames[langID]
 	if !ok {
-		return "", fmt.Errorf("language %s does not exist", langID)
+		db.log.Errorw("language doesn't exist", "lang_id", langID)
+		return "", false
 	}
 
-	return name, nil
+	return name, true
 }
 
-func (db *WordDB) GetWordPackName(langID, packID string) (string, error) {
+func (db *WordDB) GetWordPackName(langID, packID string) (string, bool) {
 	var name string
 	names, ok := db.packNames[langID]
 	if ok {
 		name, ok = names[packID]
 	}
 	if !ok {
-		return "", fmt.Errorf("word pack %s/%s does not exist", langID, packID)
+		db.log.Errorw("word pack doesn't exist",
+			"lang_id", langID,
+			"pack_id", packID)
+		return "", false
 	}
 
-	return name, nil
+	return name, true
 }
 
-func (db *WordDB) GetWordPack(langID, packID string) (*WordPack, error) {
+func (db *WordDB) GetWordPack(langID, packID string) (*WordPack, bool) {
 	pack, ok := db.packs[langID][packID]
 	if !ok {
-		return nil, fmt.Errorf("word pack %s/%s does not exist", langID, packID)
+		db.log.Errorw("word pack doesn't exist",
+			"lang_id", langID,
+			"pack_id", packID)
+		return nil, false
 	}
 
-	return pack, nil
+	return pack, true
 }
 
-func (db *WordDB) LoadWordPack(path, langID, packID, part, langName, packName string) error {
-	pack, err := loadWordPack(langID, packID, path, part)
-	if err != nil {
-		return err
+func (db *WordDB) LoadWordPack(path, langID, packID, part, langName, packName string) bool {
+	pack, ok := db.loadWordPackImp(langID, packID, path, part)
+	if !ok {
+		return false
 	}
 
 	if _, ok := db.packs[langID]; !ok {
@@ -151,5 +164,5 @@ func (db *WordDB) LoadWordPack(path, langID, packID, part, langName, packName st
 	db.packIDs[langID] = append(db.packIDs[langID], packID)
 	db.packNames[langID][packID] = packName
 
-	return nil
+	return true
 }

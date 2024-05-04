@@ -12,6 +12,7 @@ type Config struct {
 	TgToken      string `koanf:"tg_token"`
 	DBPath       string `koanf:"db_path"`
 	DictPath     string `koanf:"dict_path"`
+	Release      bool
 	Ai           AiConfig
 	GameExp      time.Duration `koanf:"game_exp"`
 	DefaultCfg   DefaultConfig `koanf:"default_cfg"`

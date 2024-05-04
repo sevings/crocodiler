@@ -4,7 +4,7 @@ import (
 	"crocodiler/internal/croc"
 	"crocodiler/internal/helper"
 	"fmt"
-	"log"
+	"go.uber.org/zap"
 	"os"
 	"os/signal"
 )
@@ -14,7 +14,7 @@ const helpArg = "--help"
 const dictArg = "--dict"
 
 func printHelp() {
-	log.Printf(
+	fmt.Printf(
 		`
 Usage: %s [option]
 
@@ -50,18 +50,35 @@ func runBot() {
 		panic(err)
 	}
 
+	var zapLogger *zap.Logger
+	if cfg.Release {
+		zapLogger, err = zap.NewProduction(zap.WithCaller(false))
+	} else {
+		zapLogger, err = zap.NewDevelopment(zap.WithCaller(false))
+	}
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = zapLogger.Sync() }()
+
+	zap.ReplaceGlobals(zapLogger)
+	zap.RedirectStdLog(zapLogger)
+	logger := zapLogger.Sugar()
+
 	wdb := croc.NewWordDB()
 	for _, lang := range cfg.Languages {
 		for _, pack := range lang.WordPacks {
-			err := wdb.LoadWordPack(pack.Path, lang.ID, pack.ID, pack.Part, lang.Name, pack.Name)
-			if err != nil {
-				fmt.Printf("Error loading %s/%s wordset: %s", lang.ID, pack.ID, err.Error())
+			ok := wdb.LoadWordPack(pack.Path, lang.ID, pack.ID, pack.Part, lang.Name, pack.Name)
+			if !ok {
+				logger.Warnw("Error loading word pack",
+					"lang_id", lang.ID,
+					"pack_id", pack.ID)
 			}
 		}
 	}
 
 	if len(wdb.GetLanguageIDs()) == 0 {
-		panic("No word packs loaded")
+		logger.Panic("no word packs loaded")
 	}
 
 	defaultChatConfig := croc.ChatConfig{
@@ -69,20 +86,20 @@ func runBot() {
 		PackID: cfg.DefaultCfg.PackID,
 		Locale: cfg.DefaultCfg.Locale,
 	}
-	db, err := croc.LoadDatabase(cfg.DBPath, defaultChatConfig)
-	if err != nil {
-		panic(err)
+	db, ok := croc.LoadDatabase(cfg.DBPath, defaultChatConfig)
+	if !ok {
+		logger.Panic("can't load database")
 	}
 
-	dict, err := croc.NewDict(cfg.DictPath)
-	if err != nil {
-		panic(err)
+	dict, ok := croc.NewDict(cfg.DictPath)
+	if !ok {
+		logger.Panic("can't load dictionary")
 	}
 	defer dict.Close()
 
-	ai, err := croc.NewAI(cfg.Ai, cfg.GameExp)
-	if err != nil {
-		panic(err)
+	ai, ok := croc.NewAI(cfg.Ai, cfg.GameExp)
+	if !ok {
+		logger.Panic("can't create AI")
 	}
 	for _, lang := range cfg.Languages {
 		if lang.Prompt != "" {
@@ -91,9 +108,9 @@ func runBot() {
 	}
 
 	game := croc.NewGame(db, wdb, dict, cfg.GameExp)
-	bot, err := croc.NewBot(cfg, wdb, db, game, dict, ai)
-	if err != nil {
-		panic(err)
+	bot, ok := croc.NewBot(cfg, wdb, db, game, dict, ai)
+	if !ok {
+		logger.Panic("can't create bot")
 	}
 
 	bot.Start()

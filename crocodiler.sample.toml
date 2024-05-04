@@ -2,6 +2,7 @@
 db = "data/db.sqlite"
 game_exp = "72h"
 dict_path = "data/dict.db"
+release = false
 
 [ai]
 provider = "openai" # or mistral

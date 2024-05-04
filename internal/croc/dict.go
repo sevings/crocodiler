@@ -1,30 +1,34 @@
 package croc
 
 import (
-	"fmt"
 	bolt "go.etcd.io/bbolt"
-	"log"
+	"go.uber.org/zap"
 )
 
 type Dict struct {
-	db *bolt.DB
+	db  *bolt.DB
+	log *zap.SugaredLogger
 }
 
-func NewDict(path string) (*Dict, error) {
+func NewDict(path string) (*Dict, bool) {
+	log := zap.L().Named("dict").Sugar()
 	db, err := bolt.Open(path, 0400, &bolt.Options{ReadOnly: true})
 	if err != nil {
-		return nil, err
+		log.Error(err)
+		return nil, false
 	}
 
 	return &Dict{
-		db: db,
-	}, nil
+		db:  db,
+		log: log,
+	}, true
 }
 
-func (d *Dict) FindDefinition(lang, part, query string) (string, error) {
+func (d *Dict) FindDefinition(lang, part, query string) (string, bool) {
 	tx, err := d.db.Begin(false)
 	if err != nil {
-		return "", err
+		d.log.Error(err)
+		return "", false
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -33,23 +37,28 @@ func (d *Dict) FindDefinition(lang, part, query string) (string, error) {
 		bkt = bkt.Bucket([]byte(part))
 	}
 	if bkt == nil {
-		return "", fmt.Errorf("bucket '%s/%s' does not exist", lang, part)
+		d.log.Errorw("bucket does not exist",
+			"lang", lang,
+			"part", part)
+		return "", false
 	}
 
 	def := bkt.Get([]byte(query))
 	if def == nil {
-		return "", fmt.Errorf("definition of word '%s' not found", query)
+		d.log.Warnw("definition of the word not found",
+			"query", query)
+		return "", false
 	}
 
 	res := make([]byte, len(def))
 	copy(res, def)
 
-	return string(res), nil
+	return string(res), true
 }
 
 func (d *Dict) Close() {
 	err := d.db.Close()
 	if err != nil {
-		log.Println(err)
+		d.log.Warn(err)
 	}
 }

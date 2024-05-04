@@ -2,6 +2,7 @@ package croc
 
 import (
 	"github.com/glebarez/sqlite"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"time"
 )
@@ -21,21 +22,24 @@ type ChatConfig struct {
 	DeletedAt gorm.DeletedAt
 }
 
-func LoadDatabase(path string, defaultCfg ChatConfig) (*DB, error) {
+func LoadDatabase(path string, defaultCfg ChatConfig) (*DB, bool) {
+	log := zap.L().Named("db").Sugar()
 	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 	if err != nil {
-		return nil, err
+		log.Error(err)
+		return nil, false
 	}
 
 	err = db.AutoMigrate(&ChatConfig{})
 	if err != nil {
-		return nil, err
+		log.Error(err)
+		return nil, false
 	}
 
 	return &DB{
 		db:  db,
 		cfg: defaultCfg,
-	}, nil
+	}, true
 }
 
 func (db *DB) LoadChatConfig(chatID int64) *ChatConfig {

@@ -7,6 +7,7 @@ import (
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/mistral"
 	"github.com/tmc/langchaingo/llms/openai"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -62,19 +63,30 @@ type AI struct {
 	prompts map[string]string
 	chats   imcache.Cache[int64, *aiChat]
 	opts    []llms.CallOption
+	log     *zap.SugaredLogger
 	maxHst  int
 	maxInp  int
 	chatExp imcache.Expiration
 }
 
-func NewAI(cfg AiConfig, exp time.Duration) (*AI, error) {
+func NewAI(cfg AiConfig, exp time.Duration) (*AI, bool) {
 	ai := &AI{
 		prompts: make(map[string]string),
 		opts:    make([]llms.CallOption, 0),
+		log:     zap.L().Named("ai").Sugar(),
 		maxHst:  cfg.MaxHst,
 		maxInp:  cfg.MaxInp,
 		chatExp: imcache.WithSlidingExpiration(exp),
 	}
+
+	ai.log.Infow("creating AI",
+		"provider", cfg.Provider,
+		"base_url", cfg.BaseUrl,
+		"api_key_set", cfg.ApiKey != "",
+		"model", cfg.Model,
+		"temperature", cfg.Temp,
+		"max_tokens", cfg.MaxTok,
+		"stop_words", cfg.Stop)
 
 	var err error
 	switch cfg.Provider {
@@ -106,14 +118,15 @@ func NewAI(cfg AiConfig, exp time.Duration) (*AI, error) {
 		err = fmt.Errorf("unknown AI provider: %s", cfg.Provider)
 	}
 	if err != nil {
-		return nil, err
+		ai.log.Error(err)
+		return nil, false
 	}
 
 	ai.opts = append(ai.opts, llms.WithTemperature(cfg.Temp))
 	ai.opts = append(ai.opts, llms.WithMaxTokens(cfg.MaxTok))
 	ai.opts = append(ai.opts, llms.WithStopWords(cfg.Stop))
 
-	return ai, nil
+	return ai, true
 }
 
 func (ai *AI) SetPrompt(langID, text string) {
@@ -128,52 +141,73 @@ func (ai *AI) StartChat(userID int64, langID string) bool {
 
 	chat := newAiChat(pmt, ai.maxHst)
 	ai.chats.Set(userID, chat, ai.chatExp)
+	ai.log.Infow("chat started", "user_id", userID)
 	return true
 }
 
-func (ai *AI) ClearChar(userID int64) error {
+func (ai *AI) ClearChar(userID int64) bool {
 	chat, ok := ai.chats.Get(userID)
 	if !ok {
-		return fmt.Errorf("chat for user %d does not exist", userID)
+		ai.log.Warnw("chat does not exist", "user_id", userID)
+		return false
 	}
 
 	chat.clear()
-	return nil
+	ai.log.Infow("chat cleared", "user_id", userID)
+	return true
 }
 
 func (ai *AI) StopChat(userID int64) {
 	ai.chats.Remove(userID)
+	ai.log.Infow("chat stopped", "user_id", userID)
 }
 
-func (ai *AI) SendMessage(userID int64, text string) (string, error) {
+func (ai *AI) SendMessage(userID int64, text string) (string, bool) {
+	beginTime := time.Now().UnixNano()
+	ai.log.Infow("user message",
+		"user_id", userID,
+		"size", len(text))
 	if len(text) > ai.maxInp {
-		return "", fmt.Errorf("message from user %d is too long", userID)
+		ai.log.Warnw("message from user is too long", "user_id", userID)
+		return "", false
 	}
 
 	chat, ok := ai.chats.Get(userID)
 	if !ok {
-		return "", fmt.Errorf("chat for user %d does not exist", userID)
+		ai.log.Warnw("chat for user does not exist", "user_id", userID)
+		return "", false
 	}
 
 	chat.addUserMessage(text)
 	resp, err := ai.llm.GenerateContent(context.Background(), chat.messages, ai.opts...)
 	if err != nil {
-		return "", err
+		ai.log.Warnw(err.Error(), "user_id", userID)
+		return "", false
 	}
 
 	if len(resp.Choices) == 0 {
-		return "", fmt.Errorf("no content returned from model")
+		ai.log.Warnw("no content returned from model", "user_id", userID)
+		return "", false
 	}
 
 	if len(resp.Choices) > 1 {
-		fmt.Printf("Returned choices: %d", len(resp.Choices))
+		ai.log.Warnf("model returned %d choices instead of one", len(resp.Choices))
 	}
 
 	reply := resp.Choices[0].Content
 	if reply == "" {
-		return "", fmt.Errorf("model reply content is empty")
+		ai.log.Warnw("model reply content is empty", "user_id", userID)
+		return "", false
 	}
 
 	chat.addBotMessage(reply)
-	return reply, nil
+
+	endTime := time.Now().UnixNano()
+	duration := float64(endTime-beginTime) / 1000000
+	ai.log.Infow("ai message",
+		"user_id", userID,
+		"size", len(reply),
+		"dur", fmt.Sprintf("%.2f", duration))
+
+	return reply, true
 }
