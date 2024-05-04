@@ -332,10 +332,7 @@ func (bot *Bot) changeWordPack(c tele.Context) error {
 	if c.Chat().Type == tele.ChatPrivate {
 		ok := bot.ai.StartChat(c.Sender().ID, langPack[0])
 		if !ok {
-			err := c.Respond(&tele.CallbackResponse{
-				Text:      bot.tr(msgChangeLang, bot.getLocale(c)),
-				ShowAlert: true,
-			})
+			err := respondAlert(c, bot.tr(msgChangeLang, bot.getLocale(c)))
 			if err != nil {
 				return err
 			}
@@ -357,10 +354,7 @@ func (bot *Bot) changeWordPack(c tele.Context) error {
 				"word": word,
 			},
 		}
-		err := c.Respond(&tele.CallbackResponse{
-			Text:      bot.trCfg(lc, locale),
-			ShowAlert: true,
-		})
+		err := respondAlert(c, bot.trCfg(lc, locale))
 		if err != nil {
 			bot.log.Warn(err)
 		}
@@ -465,10 +459,7 @@ func (bot *Bot) assignGameHost(c tele.Context) error {
 	locale := bot.getLocale(c)
 	word, hasDef, ok := bot.game.Play(c.Chat().ID, c.Sender().ID)
 	if !ok {
-		return c.Respond(&tele.CallbackResponse{
-			Text:      bot.tr(msgGameActive, locale),
-			ShowAlert: true,
-		})
+		return respondAlert(c, bot.tr(msgGameActive, locale))
 	}
 
 	if c.Chat().Type == tele.ChatPrivate {
@@ -481,10 +472,7 @@ func (bot *Bot) assignGameHost(c tele.Context) error {
 			"word": word,
 		},
 	}
-	err := c.Respond(&tele.CallbackResponse{
-		Text:      bot.trCfg(lc, locale),
-		ShowAlert: true,
-	})
+	err := respondAlert(c, bot.trCfg(lc, locale))
 	if err != nil {
 		return err
 	}
@@ -527,10 +515,7 @@ func (bot *Bot) showWord(c tele.Context) error {
 		text = bot.tr(msgNotHost, bot.getLocale(c))
 	}
 
-	return c.Respond(&tele.CallbackResponse{
-		Text:      text,
-		ShowAlert: true,
-	})
+	return respondAlert(c, text)
 }
 
 func truncateDefinition(text string, maxLen int) string {
@@ -579,10 +564,7 @@ func (bot *Bot) showDefinition(c tele.Context) error {
 		text = bot.tr(msgNotHost, bot.getLocale(c))
 	}
 
-	return c.Respond(&tele.CallbackResponse{
-		Text:      text,
-		ShowAlert: true,
-	})
+	return respondAlert(c, text)
 }
 
 func (bot *Bot) showOldDefinition(c tele.Context) error {
@@ -621,10 +603,7 @@ func (bot *Bot) skipWord(c tele.Context) error {
 	word, hasDef, ok := bot.game.SkipWord(c.Chat().ID, c.Sender().ID)
 	if !ok {
 		text := bot.tr(msgNotHost, locale)
-		return c.Respond(&tele.CallbackResponse{
-			Text:      text,
-			ShowAlert: true,
-		})
+		return respondAlert(c, text)
 	}
 
 	lc := &i18n.LocalizeConfig{
@@ -652,10 +631,7 @@ func (bot *Bot) skipWord(c tele.Context) error {
 		bot.ai.ClearChar(c.Sender().ID)
 	}
 
-	return c.Respond(&tele.CallbackResponse{
-		Text:      text,
-		ShowAlert: true,
-	})
+	return respondAlert(c, text)
 }
 
 func (bot *Bot) checkGuess(c tele.Context) error {
@@ -729,4 +705,11 @@ func printUserName(user *tele.User) string {
 
 	return fmt.Sprintf("<b>%s %s</b>",
 		user.FirstName, user.LastName)
+}
+
+func respondAlert(c tele.Context, text string) error {
+	return c.Respond(&tele.CallbackResponse{
+		Text:      text,
+		ShowAlert: true,
+	})
 }
