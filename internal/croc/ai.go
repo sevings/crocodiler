@@ -12,22 +12,34 @@ import (
 )
 
 type aiChat struct {
+	id       uint32
 	messages []llms.MessageContent
 	maxHst   int
+	log      *zap.SugaredLogger
+	word     string
 }
 
-func newAiChat(prompt string, maxHistory int) *aiChat {
-	ai := &aiChat{
+func newAiChat(prompt string, maxHistory int, log *zap.SugaredLogger) *aiChat {
+	chat := &aiChat{
 		messages: make([]llms.MessageContent, 0, 3),
 		maxHst:   maxHistory,
+		log:      log,
 	}
 
-	ai.addMessage(llms.ChatMessageTypeSystem, prompt)
+	chat.addMessage(llms.ChatMessageTypeSystem, prompt)
 
-	return ai
+	return chat
 }
 
 func (chat *aiChat) addMessage(role llms.ChatMessageType, text string) {
+	if role != llms.ChatMessageTypeSystem {
+		chat.log.Infow("dialog",
+			"id", chat.id,
+			"word", chat.word,
+			"role", role,
+			"text", text)
+	}
+
 	msg := llms.MessageContent{
 		Role:  role,
 		Parts: make([]llms.ContentPart, 0),
@@ -54,8 +66,11 @@ func (chat *aiChat) addBotMessage(text string) {
 	chat.addMessage(llms.ChatMessageTypeAI, text)
 }
 
-func (chat *aiChat) clear() {
+func (chat *aiChat) restart(word string) {
+	const epoch = 17040672000
+	chat.id = uint32(time.Now().UnixMilli()/100 - epoch)
 	chat.messages = chat.messages[:1]
+	chat.word = word
 }
 
 type AI struct {
@@ -133,27 +148,26 @@ func (ai *AI) SetPrompt(langID, text string) {
 	ai.prompts[langID] = text
 }
 
-func (ai *AI) StartChat(userID int64, langID string) bool {
+func (ai *AI) PrepareChat(userID int64, langID string) bool {
 	pmt, ok := ai.prompts[langID]
 	if !ok {
 		return false
 	}
 
-	chat := newAiChat(pmt, ai.maxHst)
+	chat := newAiChat(pmt, ai.maxHst, ai.log)
 	ai.chats.Set(userID, chat, ai.chatExp)
-	ai.log.Infow("chat started", "user_id", userID)
 	return true
 }
 
-func (ai *AI) ClearChar(userID int64) bool {
+func (ai *AI) RestartChat(userID int64, word string) bool {
 	chat, ok := ai.chats.Get(userID)
 	if !ok {
 		ai.log.Warnw("chat does not exist", "user_id", userID)
 		return false
 	}
 
-	chat.clear()
-	ai.log.Infow("chat cleared", "user_id", userID)
+	chat.restart(word)
+	ai.log.Infow("chat started", "user_id", userID)
 	return true
 }
 

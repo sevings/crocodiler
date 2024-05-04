@@ -25,8 +25,13 @@ var (
 		ID:    "msg_curr_pack",
 		Other: "Current language is <b>{{.lang}}</b>.\nCurrent word pack is <b>{{.pack}}</b>.",
 	}
-	msgCurrLang    = &i18n.Message{ID: "msg_curr_lang", Other: "Current language is <b>{{.lang}}</b>."}
-	msgSelectPack  = &i18n.Message{ID: "msg_select_pack", Other: "Please select a language and a word pack."}
+	msgCurrLang   = &i18n.Message{ID: "msg_curr_lang", Other: "Current language is <b>{{.lang}}</b>."}
+	msgSelectPack = &i18n.Message{ID: "msg_select_pack", Other: "Please select a language and a word pack."}
+	msgAiDisclaim = &i18n.Message{
+		ID: "msg_ai_disclaim",
+		Other: "The text of the messages sent during the single-player game will be saved " +
+			"and later used to improve performance of the bot.",
+	}
 	msgNewHost     = &i18n.Message{ID: "msg_new_host", Other: "{{.name}} becomes a new host."}
 	msgNotHost     = &i18n.Message{ID: "msg_not_host", Other: "You are not the current host."}
 	msgGameStopped = &i18n.Message{ID: "msg_game_stopped", Other: "Game stopped."}
@@ -330,7 +335,7 @@ func (bot *Bot) showHelp(c tele.Context) error {
 func (bot *Bot) changeWordPack(c tele.Context) error {
 	langPack := c.Args()
 	if c.Chat().Type == tele.ChatPrivate {
-		ok := bot.ai.StartChat(c.Sender().ID, langPack[0])
+		ok := bot.ai.PrepareChat(c.Sender().ID, langPack[0])
 		if !ok {
 			err := respondAlert(c, bot.tr(msgChangeLang, bot.getLocale(c)))
 			if err != nil {
@@ -344,6 +349,10 @@ func (bot *Bot) changeWordPack(c tele.Context) error {
 	word, hasDef, ok := bot.game.SetWordPack(c.Chat().ID, c.Sender().ID, langPack[0], langPack[1])
 	if !ok {
 		return c.Respond()
+	}
+
+	if word != "" && c.Chat().Type == tele.ChatPrivate {
+		bot.ai.RestartChat(c.Sender().ID, word)
 	}
 
 	locale := bot.getLocale(c)
@@ -416,26 +425,36 @@ func (bot *Bot) showLangMenu(c tele.Context) error {
 func (bot *Bot) playNewGame(c tele.Context) error {
 	if c.Chat().Type == tele.ChatPrivate {
 		cfg := bot.db.LoadChatConfig(c.Sender().ID)
-		started := bot.ai.StartChat(c.Sender().ID, cfg.LangID)
+		started := bot.ai.PrepareChat(c.Sender().ID, cfg.LangID)
 		if !started {
 			return c.Send(bot.tr(msgChangeLang, bot.getLocale(c)))
 		}
 	}
 
 	locale := bot.getLocale(c)
-	_, hasDef, ok := bot.game.Play(c.Chat().ID, c.Sender().ID)
+	word, hasDef, ok := bot.game.Play(c.Chat().ID, c.Sender().ID)
 	if !ok {
 		msg := bot.tr(msgGameActive, locale)
 		return c.Send(msg)
 	}
 
-	lc := &i18n.LocalizeConfig{
-		DefaultMessage: msgNewHost,
-		TemplateData: map[string]string{
-			"name": printUserName(c.Sender()),
-		},
+	var msg string
+	if c.Chat().Type == tele.ChatPrivate {
+		if word != "" {
+			bot.ai.RestartChat(c.Sender().ID, word)
+		}
+
+		msg = bot.tr(msgAiDisclaim, locale)
+	} else {
+		lc := &i18n.LocalizeConfig{
+			DefaultMessage: msgNewHost,
+			TemplateData: map[string]string{
+				"name": printUserName(c.Sender()),
+			},
+		}
+		msg = bot.trCfg(lc, locale)
 	}
-	msg := bot.trCfg(lc, locale)
+
 	if hasDef {
 		return c.Send(msg, bot.wordDefMenus[locale], tele.ModeHTML)
 	}
@@ -463,7 +482,7 @@ func (bot *Bot) assignGameHost(c tele.Context) error {
 	}
 
 	if c.Chat().Type == tele.ChatPrivate {
-		bot.ai.ClearChar(c.Sender().ID)
+		bot.ai.RestartChat(c.Sender().ID, word)
 	}
 
 	lc := &i18n.LocalizeConfig{
@@ -628,7 +647,7 @@ func (bot *Bot) skipWord(c tele.Context) error {
 	}
 
 	if c.Chat().Type == tele.ChatPrivate {
-		bot.ai.ClearChar(c.Sender().ID)
+		bot.ai.RestartChat(c.Sender().ID, word)
 	}
 
 	return respondAlert(c, text)
