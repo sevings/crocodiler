@@ -91,12 +91,6 @@ func (g *Game) createConfig(chatID int64) (*gameConfig, bool) {
 	}
 
 	chatConf := g.db.LoadChatConfig(chatID)
-	if chatConf.PackID == "" {
-		g.log.Warnw("word pack is not chosen",
-			"chat_id", chatID)
-		return nil, false
-	}
-
 	pack, ok := g.wdb.GetWordPack(chatConf.LangID, chatConf.PackID)
 	if !ok {
 		return nil, false
