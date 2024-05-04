@@ -173,6 +173,14 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict, ai *AI) (*B
 		bot.bot.Handle(&skipBtn, bot.skipWord)
 	}
 
+	{
+		hostMenu := &tele.ReplyMarkup{}
+		hostBtn := hostMenu.Data("", "become_host")
+		bot.bot.Handle(&hostBtn, bot.assignGameHost)
+		whatBtn := hostMenu.Data("", "whats_that")
+		bot.bot.Handle(&whatBtn, bot.showOldDefinition)
+	}
+
 	if _, ok := bot.trs[cfg.DefaultCfg.Locale]; !ok {
 		bot.log.Errorw("default locale not found", "locale", cfg.DefaultCfg.Locale)
 		return nil, false
@@ -421,7 +429,7 @@ func (bot *Bot) playNewGame(c tele.Context) error {
 	}
 
 	locale := bot.getLocale(c)
-	hasDef, ok := bot.game.Play(c.Chat().ID, c.Sender().ID)
+	_, hasDef, ok := bot.game.Play(c.Chat().ID, c.Sender().ID)
 	if !ok {
 		msg := bot.tr(msgSelectPack, locale)
 		return c.Send(msg, bot.langMenu)
@@ -455,7 +463,7 @@ func (bot *Bot) stopGame(c tele.Context) error {
 
 func (bot *Bot) assignGameHost(c tele.Context) error {
 	locale := bot.getLocale(c)
-	word, hasDef, ok := bot.game.NextWord(c.Chat().ID, c.Sender().ID)
+	word, hasDef, ok := bot.game.Play(c.Chat().ID, c.Sender().ID)
 	if !ok {
 		return c.Respond(&tele.CallbackResponse{
 			Text:      bot.tr(msgGameActive, locale),
@@ -693,14 +701,12 @@ func (bot *Bot) checkGuess(c tele.Context) error {
 
 	hostMenu := &tele.ReplyMarkup{}
 	hostBtn := hostMenu.Data(bot.tr(btnBecomeHost, locale), "become_host")
-	bot.bot.Handle(&hostBtn, bot.assignGameHost)
 	if hasDef {
 		cfg := bot.db.LoadChatConfig(c.Chat().ID)
 		pack, ok := bot.wdb.GetWordPack(cfg.LangID, cfg.PackID)
 		if ok {
 			whatBtn := hostMenu.Data(bot.tr(btnWhatsThat, locale), "whats_that",
 				pack.langID, pack.part, word)
-			bot.bot.Handle(&whatBtn, bot.showOldDefinition)
 			hostMenu.Inline(hostMenu.Row(hostBtn), hostMenu.Row(whatBtn))
 		} else {
 			hostMenu.Inline(hostMenu.Row(hostBtn))
