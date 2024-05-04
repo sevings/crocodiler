@@ -12,9 +12,10 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.4.0
 	github.com/tmc/langchaingo v0.1.9
 	go.etcd.io/bbolt v1.3.9
-	golang.org/x/text v0.14.0
+	go.uber.org/zap v1.27.0
+	golang.org/x/text v0.15.0
 	gopkg.in/telebot.v3 v3.2.1
-	gorm.io/gorm v1.25.9
+	gorm.io/gorm v1.25.10
 )
 
 require (
@@ -35,6 +36,7 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pkoukk/tiktoken-go v0.1.6 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/sys v0.19.0 // indirect
 	modernc.org/libc v1.49.2 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
