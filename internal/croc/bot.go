@@ -617,20 +617,23 @@ func (bot *Bot) showOldDefinition(c tele.Context) error {
 }
 
 func (bot *Bot) skipWord(c tele.Context) error {
-	var text string
 	locale := bot.getLocale(c)
 	word, hasDef, ok := bot.game.SkipWord(c.Chat().ID, c.Sender().ID)
-	if ok {
-		lc := &i18n.LocalizeConfig{
-			DefaultMessage: msgNewWord,
-			TemplateData: map[string]string{
-				"word": word,
-			},
-		}
-		text = bot.trCfg(lc, locale)
-	} else {
-		text = bot.tr(msgNotHost, locale)
+	if !ok {
+		text := bot.tr(msgNotHost, locale)
+		return c.Respond(&tele.CallbackResponse{
+			Text:      text,
+			ShowAlert: true,
+		})
 	}
+
+	lc := &i18n.LocalizeConfig{
+		DefaultMessage: msgNewWord,
+		TemplateData: map[string]string{
+			"word": word,
+		},
+	}
+	text := bot.trCfg(lc, locale)
 
 	oldHasDef := len(c.Message().ReplyMarkup.InlineKeyboard) > 2
 	if oldHasDef != hasDef {
