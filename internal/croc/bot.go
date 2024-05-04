@@ -425,8 +425,8 @@ func (bot *Bot) playNewGame(c tele.Context) error {
 	locale := bot.getLocale(c)
 	_, hasDef, ok := bot.game.Play(c.Chat().ID, c.Sender().ID)
 	if !ok {
-		msg := bot.tr(msgSelectPack, locale)
-		return c.Send(msg, bot.langMenu)
+		msg := bot.tr(msgGameActive, locale)
+		return c.Send(msg)
 	}
 
 	lc := &i18n.LocalizeConfig{
