@@ -55,15 +55,65 @@ func UpdateDictionary() {
 	}
 }
 
+type glossary struct {
+	senses   []string
+	redirect string
+}
+
+func newGlossary(wd *wordDef) *glossary {
+	gloss := &glossary{senses: make([]string, 0, len(wd.Senses))}
+	gloss.addSenses(wd)
+	return gloss
+}
+
+func (gloss *glossary) lastSense() string {
+	size := len(gloss.senses)
+	if size == 0 {
+		return ""
+	}
+
+	return gloss.senses[size-1]
+}
+
+func (gloss *glossary) addSenses(wd *wordDef) {
+	for i := range wd.Senses {
+		var sense string
+		if len(wd.Senses[i].RawGlosses) > 0 {
+			sense = wd.Senses[i].RawGlosses[0]
+		} else if len(wd.Senses[i].Glosses) > 0 {
+			sense = wd.Senses[i].Glosses[0]
+		}
+
+		if sense == "" {
+			continue
+		}
+
+		if sense != gloss.lastSense() {
+			gloss.senses = append(gloss.senses, sense)
+		}
+	}
+}
+
+func (gloss *glossary) getDefinition() string {
+	if len(gloss.senses) == 1 {
+		return gloss.senses[0]
+	}
+
+	var def string
+	for i, sense := range gloss.senses {
+		def += fmt.Sprintf("%d) %s\n", i+1, sense)
+	}
+
+	return def
+}
+
 type langUpdater struct {
 	db      *bolt.DB
 	langID  string
-	allDefs map[string]*wordDef
+	allDefs map[string]*glossary
 }
 
 func newLangUpdater(db *bolt.DB, lang LanguageConfig) (*langUpdater, error) {
-	allDefs := make(map[string]*wordDef)
-
 	fmt.Printf("Loading dictionary from file %s...\n", lang.Dict.Path)
 	file, err := os.Open(lang.Dict.Path)
 	if err != nil {
@@ -75,6 +125,8 @@ func newLangUpdater(db *bolt.DB, lang LanguageConfig) (*langUpdater, error) {
 			log.Println(err)
 		}
 	}(file)
+
+	allDefs := make(map[string]*glossary)
 
 	var wordCount int
 	scanner := bufio.NewScanner(file)
@@ -108,18 +160,20 @@ func newLangUpdater(db *bolt.DB, lang LanguageConfig) (*langUpdater, error) {
 			key = "redirect/" + wd.Title
 		}
 
-		prevDef, exist := allDefs[key]
+		gloss, exist := allDefs[key]
 		if exist {
-			prevDef.Senses = append(prevDef.Senses, wd.Senses...)
+			gloss.addSenses(wd)
 			continue
 		}
 
-		allDefs[key] = wd
-		allDefs["low/"+strings.ToLower(key)] = wd
+		gloss = newGlossary(wd)
+
+		allDefs[key] = gloss
+		allDefs["low/"+strings.ToLower(key)] = gloss
 		if wd.Word != "" && lang.Dict.Parts {
 			key = "any-pos/" + wd.Word
-			allDefs[key] = wd
-			allDefs["low/"+strings.ToLower(key)] = wd
+			allDefs[key] = gloss
+			allDefs["low/"+strings.ToLower(key)] = gloss
 		}
 		wordCount++
 	}
@@ -225,58 +279,35 @@ func (lu langUpdater) findDefinition(query, pos string) (string, error) {
 	} else {
 		key = pos + "/" + query
 	}
-	wd, found := lu.allDefs[key]
+	gloss, found := lu.allDefs[key]
 	if !found {
-		wd, found = lu.allDefs["low/"+strings.ToLower(key)]
+		gloss, found = lu.allDefs["low/"+strings.ToLower(key)]
 	}
 	if !found {
 		key = "redirect/" + query
-		wd, found = lu.allDefs[key]
+		gloss, found = lu.allDefs[key]
 		if !found {
-			wd, found = lu.allDefs["low/"+strings.ToLower(key)]
+			gloss, found = lu.allDefs["low/"+strings.ToLower(key)]
 		}
 		if found {
 			if pos == "" {
-				key = wd.Redirect
+				key = gloss.redirect
 			} else {
-				key = pos + "/" + wd.Redirect
+				key = pos + "/" + gloss.redirect
 			}
-			wd, found = lu.allDefs[key]
+			gloss, found = lu.allDefs[key]
 		}
 	}
 	if !found && pos != "" {
 		key = "any-pos/" + query
-		wd, found = lu.allDefs[key]
+		gloss, found = lu.allDefs[key]
 		if !found {
-			wd, found = lu.allDefs["low/"+strings.ToLower(key)]
+			gloss, found = lu.allDefs["low/"+strings.ToLower(key)]
 		}
 	}
 	if !found {
 		return "", fmt.Errorf("definition of word '%s' not found", query)
 	}
 
-	var def string
-	if len(wd.Senses) == 1 {
-		if len(wd.Senses[0].RawGlosses) > 0 {
-			def = wd.Senses[0].RawGlosses[0]
-		} else if len(wd.Senses[0].Glosses) > 0 {
-			def = wd.Senses[0].Glosses[0]
-		} else {
-			return "", fmt.Errorf("no glosses exist for word %s", query)
-		}
-	} else {
-		for i := range wd.Senses {
-			var sense string
-			if len(wd.Senses[i].RawGlosses) > 0 {
-				sense = wd.Senses[i].RawGlosses[0]
-			} else if len(wd.Senses[i].Glosses) > 0 {
-				sense = wd.Senses[i].Glosses[0]
-			}
-			if sense != "" {
-				def += fmt.Sprintf("%d) %s\n", i+1, sense)
-			}
-		}
-	}
-
-	return def, nil
+	return gloss.getDefinition(), nil
 }
