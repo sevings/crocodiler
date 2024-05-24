@@ -303,7 +303,7 @@ func (bot *Bot) showTrMenu(c tele.Context) error {
 
 func (bot *Bot) changeTr(c tele.Context) error {
 	locale := c.Data()
-	bot.db.setLocale(c.Chat().ID, locale)
+	bot.db.SetLocale(c.Chat().ID, locale)
 
 	err := c.Respond(&tele.CallbackResponse{Text: bot.tr(msgLangChanged, locale)})
 	if err != nil {
@@ -553,30 +553,25 @@ func truncateDefinition(text string, maxLen int) string {
 	if len(runes) <= maxLen {
 		return text
 	}
-	runes = runes[:maxLen-1]
 
 	splitters := []rune{'\n', '.', ' '}
-	for si, s := range splitters {
-		lastIdx := 0
-		for i := len(runes) - 1; i >= 0; i-- {
+	for _, s := range splitters {
+		lastIdx := -1
+		for i := maxLen - 1; i >= 0; i-- {
 			if runes[i] == s {
 				lastIdx = i
 				break
 			}
 		}
 
-		if si < len(splitters)-1 {
-			if lastIdx < maxLen/2 {
-				continue
-			}
-		} else {
-			if lastIdx <= 0 {
-				continue
-			}
+		if lastIdx != -1 && (lastIdx >= maxLen/2 || s == splitters[len(splitters)-1]) {
+			runes = runes[:lastIdx]
+			break
 		}
+	}
 
-		runes = runes[:lastIdx]
-		break
+	if len(runes) >= maxLen {
+		runes = runes[:maxLen-1]
 	}
 
 	return string(runes) + "…"

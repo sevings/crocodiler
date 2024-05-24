@@ -68,7 +68,7 @@ func (db *DB) SetWordPack(chatID int64, langID, packID string) {
 	}
 }
 
-func (db *DB) setLocale(chatID int64, locale string) {
+func (db *DB) SetLocale(chatID int64, locale string) {
 	tx := db.db.Model(&ChatConfig{}).Where(chatID).
 		Update("locale", locale)
 
