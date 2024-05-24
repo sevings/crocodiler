@@ -251,8 +251,8 @@ func (bot *Bot) logMessage(next tele.HandlerFunc) tele.HandlerFunc {
 		endTime := time.Now().UnixNano()
 		duration := float64(endTime-beginTime) / 1000000
 
-		if c.Chat().Type == tele.ChatPrivate || strings.Contains(c.Text(), mention) {
-			isCmd := len(c.Text()) > 0 && c.Text()[0] == '/' && len(c.Entities()) == 1
+		isCmd := len(c.Text()) > 0 && c.Text()[0] == '/' && len(c.Entities()) == 1
+		if c.Chat().Type == tele.ChatPrivate || strings.Contains(c.Text(), mention) || isCmd {
 			var cmd string
 			if isCmd {
 				cmd = c.Text()
@@ -264,13 +264,6 @@ func (bot *Bot) logMessage(next tele.HandlerFunc) tele.HandlerFunc {
 				"user_name", c.Sender().Username,
 				"is_cmd", isCmd,
 				"cmd", cmd,
-				"size", len(c.Text()),
-				"dur", fmt.Sprintf("%.2f", duration),
-				"err", err)
-		} else {
-			bot.log.Infow("user message",
-				"chat_id", c.Chat().ID,
-				"chat_type", c.Chat().Type,
 				"size", len(c.Text()),
 				"dur", fmt.Sprintf("%.2f", duration),
 				"err", err)
