@@ -482,13 +482,14 @@ func (bot *Bot) stopGame(c tele.Context) error {
 }
 
 func (bot *Bot) assignGameHost(c tele.Context) error {
-	locale := bot.getLocale(c)
+	cfg := bot.db.LoadChatConfig(c.Sender().ID)
 	word, hasDef, ok := bot.game.Play(c.Chat().ID, c.Sender().ID)
 	if !ok {
-		return respondAlert(c, bot.tr(msgGameActive, locale))
+		return respondAlert(c, bot.tr(msgGameActive, cfg.Locale))
 	}
 
 	if c.Chat().Type == tele.ChatPrivate {
+		bot.ai.PrepareChat(c.Sender().ID, cfg.LangID)
 		bot.ai.RestartChat(c.Sender().ID, word)
 	}
 
@@ -498,7 +499,7 @@ func (bot *Bot) assignGameHost(c tele.Context) error {
 			"word": word,
 		},
 	}
-	err := respondAlert(c, bot.trCfg(lc, locale))
+	err := respondAlert(c, bot.trCfg(lc, cfg.Locale))
 	if err != nil {
 		return err
 	}
@@ -519,11 +520,11 @@ func (bot *Bot) assignGameHost(c tele.Context) error {
 			"name": printUserName(c.Sender()),
 		},
 	}
-	msg := bot.trCfg(lc, locale)
+	msg := bot.trCfg(lc, cfg.Locale)
 	if hasDef {
-		return c.Send(msg, bot.wordDefMenus[locale], tele.ModeHTML)
+		return c.Send(msg, bot.wordDefMenus[cfg.Locale], tele.ModeHTML)
 	}
-	return c.Send(msg, bot.wordMenus[locale], tele.ModeHTML)
+	return c.Send(msg, bot.wordMenus[cfg.Locale], tele.ModeHTML)
 }
 
 func (bot *Bot) showWord(c tele.Context) error {
