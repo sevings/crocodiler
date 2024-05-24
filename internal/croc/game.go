@@ -126,7 +126,7 @@ func (g *Game) Play(chatID, hostID int64) (string, bool, bool) {
 func (g *Game) SetWordPack(chatID, playerID int64, langID, packID string) (string, bool, bool) {
 	gameConf, ok := g.games.Get(chatID)
 	if !ok {
-		return "", false, false
+		return "", false, true
 	}
 
 	if gameConf.isActive() && gameConf.hostID != playerID {
