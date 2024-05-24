@@ -395,7 +395,7 @@ func (bot *Bot) showWordPackMenu(c tele.Context) error {
 	return c.Edit(bot.trCfg(lc, bot.getLocale(c)), bot.packMenus[langID], tele.ModeHTML)
 }
 
-func (bot *Bot) showLangMenu(c tele.Context) error {
+func (bot *Bot) getLangMessage(c tele.Context) string {
 	id := c.Chat().ID
 	conf := bot.db.LoadChatConfig(id)
 	var msg string
@@ -414,10 +414,22 @@ func (bot *Bot) showLangMenu(c tele.Context) error {
 		msg = bot.trCfg(lc, bot.getLocale(c))
 	}
 
+	return msg
+}
+
+func (bot *Bot) showLangMenu(c tele.Context) error {
+	msg := bot.getLangMessage(c)
+
 	return c.Send(msg, bot.langMenu, tele.ModeHTML)
 }
 
 func (bot *Bot) playNewGame(c tele.Context) error {
+	langMsg := bot.getLangMessage(c)
+	err := c.Send(langMsg, tele.ModeHTML)
+	if err != nil {
+		return err
+	}
+
 	if c.Chat().Type == tele.ChatPrivate {
 		cfg := bot.db.LoadChatConfig(c.Sender().ID)
 		started := bot.ai.PrepareChat(c.Sender().ID, cfg.LangID)
