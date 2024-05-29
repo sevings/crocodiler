@@ -330,7 +330,7 @@ func (bot *Bot) showHelp(c tele.Context) error {
 func (bot *Bot) changeWordPack(c tele.Context) error {
 	langPack := c.Args()
 	if c.Chat().Type == tele.ChatPrivate {
-		ok := bot.ai.PrepareChat(c.Sender().ID, langPack[0])
+		ok := bot.ai.PrepareChat(c.Chat().ID, langPack[0])
 		if !ok {
 			err := respondAlert(c, bot.tr(msgChangeLang, bot.getLocale(c)))
 			if err != nil {
@@ -347,7 +347,7 @@ func (bot *Bot) changeWordPack(c tele.Context) error {
 	}
 
 	if word != "" && c.Chat().Type == tele.ChatPrivate {
-		bot.ai.RestartChat(c.Sender().ID, word)
+		bot.ai.RestartChat(c.Chat().ID, word)
 	}
 
 	locale := bot.getLocale(c)
@@ -431,8 +431,8 @@ func (bot *Bot) playNewGame(c tele.Context) error {
 	}
 
 	if c.Chat().Type == tele.ChatPrivate {
-		cfg := bot.db.LoadChatConfig(c.Sender().ID)
-		started := bot.ai.PrepareChat(c.Sender().ID, cfg.LangID)
+		cfg := bot.db.LoadChatConfig(c.Chat().ID)
+		started := bot.ai.PrepareChat(c.Chat().ID, cfg.LangID)
 		if !started {
 			return c.Send(bot.tr(msgChangeLang, bot.getLocale(c)))
 		}
@@ -448,7 +448,7 @@ func (bot *Bot) playNewGame(c tele.Context) error {
 	var msg string
 	if c.Chat().Type == tele.ChatPrivate {
 		if word != "" {
-			bot.ai.RestartChat(c.Sender().ID, word)
+			bot.ai.RestartChat(c.Chat().ID, word)
 		}
 
 		msg = bot.tr(msgAiDisclaim, locale)
@@ -470,7 +470,7 @@ func (bot *Bot) playNewGame(c tele.Context) error {
 
 func (bot *Bot) stopGame(c tele.Context) error {
 	if c.Chat().Type == tele.ChatPrivate {
-		bot.ai.StopChat(c.Sender().ID)
+		bot.ai.StopChat(c.Chat().ID)
 	}
 
 	ok := bot.game.Stop(c.Chat().ID, c.Sender().ID)
@@ -482,15 +482,15 @@ func (bot *Bot) stopGame(c tele.Context) error {
 }
 
 func (bot *Bot) assignGameHost(c tele.Context) error {
-	cfg := bot.db.LoadChatConfig(c.Sender().ID)
+	cfg := bot.db.LoadChatConfig(c.Chat().ID)
 	word, hasDef, ok := bot.game.Play(c.Chat().ID, c.Sender().ID)
 	if !ok {
 		return respondAlert(c, bot.tr(msgGameActive, cfg.Locale))
 	}
 
 	if c.Chat().Type == tele.ChatPrivate {
-		bot.ai.PrepareChat(c.Sender().ID, cfg.LangID)
-		bot.ai.RestartChat(c.Sender().ID, word)
+		bot.ai.PrepareChat(c.Chat().ID, cfg.LangID)
+		bot.ai.RestartChat(c.Chat().ID, word)
 	}
 
 	lc := &i18n.LocalizeConfig{
@@ -650,7 +650,7 @@ func (bot *Bot) skipWord(c tele.Context) error {
 	}
 
 	if c.Chat().Type == tele.ChatPrivate {
-		bot.ai.RestartChat(c.Sender().ID, word)
+		bot.ai.RestartChat(c.Chat().ID, word)
 	}
 
 	return respondAlert(c, text)
@@ -671,7 +671,7 @@ func (bot *Bot) checkGuess(c tele.Context) error {
 			replied = "> " + strings.ReplaceAll(replied, "\n", "\n> ")
 			text = replied + "\n\n" + text
 		}
-		reply, ok := bot.ai.SendMessage(c.Sender().ID, text)
+		reply, ok := bot.ai.SendMessage(c.Chat().ID, text)
 		if !ok {
 			return nil
 		}
