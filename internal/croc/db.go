@@ -79,3 +79,9 @@ func (db *DB) SetLocale(chatID int64, locale string) {
 		db.db.Create(&cfg)
 	}
 }
+
+func (db *DB) GetChatCount() int64 {
+	var cnt int64
+	db.db.Model(&ChatConfig{}).Count(&cnt)
+	return cnt
+}

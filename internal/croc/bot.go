@@ -8,7 +8,9 @@ import (
 	"golang.org/x/text/language"
 	tele "gopkg.in/telebot.v3"
 	"gopkg.in/telebot.v3/middleware"
+	"math"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -71,6 +73,11 @@ type Bot struct {
 	wordMenus    map[string]*tele.ReplyMarkup
 	wordDefMenus map[string]*tele.ReplyMarkup
 	trMenu       *tele.ReplyMarkup
+
+	startedAt      time.Time
+	userGuessCount atomic.Int64
+	AiGuessCount   atomic.Int64
+	wordCount      atomic.Int64
 }
 
 func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict, ai *AI) (*Bot, bool) {
@@ -93,6 +100,8 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict, ai *AI) (*B
 		wordMenus:    make(map[string]*tele.ReplyMarkup),
 		wordDefMenus: make(map[string]*tele.ReplyMarkup),
 		trMenu:       &tele.ReplyMarkup{},
+
+		startedAt: time.Now(),
 	}
 
 	b, err := tele.NewBot(pref)
@@ -211,6 +220,7 @@ func NewBot(cfg Config, wdb *WordDB, db *DB, game *Game, dict *Dict, ai *AI) (*B
 	bot.bot.Handle(tele.OnAddedToGroup, bot.showTrMenu)
 	bot.bot.Handle("/help", bot.showHelp)
 	bot.bot.Handle("/play", bot.playNewGame)
+	bot.bot.Handle("/stat", bot.getBotStat)
 
 	bot.bot.Handle("/word_pack", bot.showLangMenu)
 	bot.bot.Handle("/stop", bot.stopGame)
@@ -665,6 +675,8 @@ func (bot *Bot) checkGuess(c tele.Context) error {
 	guesser := c.Sender()
 
 	if c.Chat().Type == tele.ChatPrivate {
+		bot.AiGuessCount.Add(1)
+
 		text := c.Message().Text
 		if c.Message().ReplyTo != nil {
 			replied := c.Message().ReplyTo.Text
@@ -683,12 +695,16 @@ func (bot *Bot) checkGuess(c tele.Context) error {
 
 		guess = reply
 		guesser = bot.bot.Me
+	} else {
+		bot.userGuessCount.Add(1)
 	}
 
 	word, hasDef, guessed := bot.game.CheckGuess(c.Chat().ID, guesser.ID, guess)
 	if !guessed {
 		return nil
 	}
+
+	bot.wordCount.Add(1)
 
 	locale := bot.getLocale(c)
 	lc := &i18n.LocalizeConfig{
@@ -717,6 +733,50 @@ func (bot *Bot) checkGuess(c tele.Context) error {
 	}
 
 	return c.Send(msg, hostMenu, tele.ModeHTML)
+}
+
+func (bot *Bot) getBotStat(c tele.Context) error {
+	var msg strings.Builder
+
+	addF64 := func(title string, value float64) {
+		if math.IsInf(value, 0) || math.IsNaN(value) {
+			value = 0
+		}
+
+		msg.WriteString(fmt.Sprintf("%s: %.2f\n", title, value))
+	}
+
+	addI64 := func(title string, value int64) {
+		msg.WriteString(fmt.Sprintf("%s: %d\n", title, value))
+	}
+
+	uptimeDays := time.Now().Sub(bot.startedAt).Hours() / 24
+	addF64("Uptime (days)", uptimeDays)
+
+	aiGuessCnt := bot.AiGuessCount.Load()
+	addI64("Total AI guesses", aiGuessCnt)
+
+	userGuessCnt := bot.userGuessCount.Load()
+	addI64("Total user guesses", userGuessCnt)
+
+	wordCnt := bot.wordCount.Load()
+	addI64("Total words guessed", wordCnt)
+
+	if uptimeDays > 0.1 {
+		avgAiGuessCnt := float64(aiGuessCnt) / uptimeDays
+		addF64("AI guesses per day", avgAiGuessCnt)
+
+		avgUserGuessCnt := float64(userGuessCnt) / uptimeDays
+		addF64("User guesses per day", avgUserGuessCnt)
+
+		avgWordCnt := float64(wordCnt) / uptimeDays
+		addF64("Words guessed per day", avgWordCnt)
+	}
+
+	groupChatCnt := bot.db.GetChatCount()
+	addI64("Total chats", groupChatCnt)
+
+	return c.Reply(msg.String(), tele.ModeHTML)
 }
 
 func printUserName(user *tele.User) string {
